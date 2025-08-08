@@ -22,15 +22,15 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
     background: {
       angle: 180,
       stops: [
-        { color: '#0A1022', pos: 0 },
-        { color: '#0E1836', pos: 60 },
-        { color: '#1A244A', pos: 100 }
+        { color: '#0A1124', pos: 0 },
+        { color: '#0E1934', pos: 58 },
+        { color: '#162247', pos: 100 }
       ],
       overlay: {
         angle: 0,
         stops: [
-          { color: '#FF8B54', pos: 0 },
-          { color: '#00000000', pos: 60 }
+          { color: '#FFB28833', pos: 0 },
+          { color: '#00000000', pos: 55 }
         ]
       }
     },
@@ -44,14 +44,14 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
       angle: 180,
       stops: [
         { color: '#0A0F26', pos: 0 },
-        { color: '#121C3E', pos: 55 },
-        { color: '#1B2856', pos: 100 }
+        { color: '#121A39', pos: 54 },
+        { color: '#1A2450', pos: 100 }
       ],
       overlay: {
         angle: 0,
         stops: [
-          { color: '#6D74E822', pos: 0 },
-          { color: '#00000000', pos: 70 }
+          { color: '#8D95FF22', pos: 0 },
+          { color: '#00000000', pos: 68 }
         ]
       }
     },
@@ -65,14 +65,14 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
       angle: 180,
       stops: [
         { color: '#07131F', pos: 0 },
-        { color: '#0A1E2C', pos: 55 },
-        { color: '#0B2A39', pos: 100 }
+        { color: '#0A1C29', pos: 54 },
+        { color: '#0B2736', pos: 100 }
       ],
       overlay: {
         angle: 0,
         stops: [
-          { color: '#3BC4A333', pos: 0 },
-          { color: '#00000000', pos: 60 }
+          { color: '#4EE1BF33', pos: 0 },
+          { color: '#00000000', pos: 58 }
         ]
       }
     },
@@ -86,14 +86,14 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
       angle: 180,
       stops: [
         { color: '#071122', pos: 0 },
-        { color: '#0B1830', pos: 60 },
-        { color: '#0E2140', pos: 100 }
+        { color: '#0A1730', pos: 59 },
+        { color: '#0D203E', pos: 100 }
       ],
       overlay: {
         angle: 0,
         stops: [
-          { color: '#7BAEFA22', pos: 0 },
-          { color: '#00000000', pos: 65 }
+          { color: '#9ED0FF22', pos: 0 },
+          { color: '#00000000', pos: 64 }
         ]
       }
     },
@@ -107,14 +107,14 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
       angle: 180,
       stops: [
         { color: '#110A1A', pos: 0 },
-        { color: '#1B0F2B', pos: 55 },
-        { color: '#24143A', pos: 100 }
+        { color: '#190E28', pos: 54 },
+        { color: '#23133A', pos: 100 }
       ],
       overlay: {
         angle: 0,
         stops: [
-          { color: '#FF7BA722', pos: 0 },
-          { color: '#00000000', pos: 70 }
+          { color: '#FFA1C622', pos: 0 },
+          { color: '#00000000', pos: 66 }
         ]
       }
     },

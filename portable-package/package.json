@@ -1,9 +1,34 @@
 {
   "name": "cloud-engine",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "CloudEngine: layered cloud SVG engine with React component CloudMaker.",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jakekinchen/cloud-test.git",
+    "directory": "portable-package"
+  },
+  "homepage": "https://github.com/jakekinchen/cloud-test#readme",
+  "bugs": {
+    "url": "https://github.com/jakekinchen/cloud-test/issues"
+  },
+  "keywords": [
+    "react",
+    "svg",
+    "clouds",
+    "background",
+    "animation",
+    "noise",
+    "hero",
+    "component"
+  ],
+  "author": {
+    "name": "Jake Kinchen"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

@@ -29,6 +29,7 @@ type CloudMakerProps = {
     amplitudeEnvelopeCycles?: number;
     peakRoundness?: number;
     peakRoundnessPower?: number;
+    seamlessLoop?: boolean;
     animate?: boolean;
     phase?: number;
     morphT?: number;
@@ -43,10 +44,10 @@ declare const CloudMaker: React.FC<CloudMakerProps>;
 declare function createCloudEngine(opts?: {}): {
     pathsAt: (phase?: number, morphT?: number, cycleIndex?: number) => {
         d: string;
-        fill: string;
+        fill: string | undefined;
         opacity: number;
     }[];
-    svgAt: (phase?: number, morphT?: number, cycleIndex?: number) => string;
+    svgAt: (phase?: number) => string;
     width: number;
     height: number;
     blur: number;

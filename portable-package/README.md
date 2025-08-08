@@ -32,7 +32,8 @@ export default function Hero() {
         // Make it edge-to-edge inside any container
         style={{ width: '100%', height: '100%' }}
         fit="stretch"           // 'stretch' | 'meet' | 'slice'
-        background={false}       // false => transparent, or provide a solid color
+        background={false}       // default is false in this package; pass a color for a solid bg
+        seamlessLoop
       />
     </div>
   );
@@ -42,7 +43,8 @@ export default function Hero() {
 - `animate` (default true) can be disabled to render a static frame.
 - When `animate={false}`, pass `phase`, `morphT`, `cycleIndex` to control the frame.
 - `fit` controls how the SVG scales within its box.
-- `background` can be `false` (transparent) or a solid color string.
+- `background` can be `false` (transparent, default in this package) or a solid color string.
+- `seamlessLoop` ensures morph fields don’t reseed each cycle (default true).
 - Use `style={{ width: '100%', height: '100%' }}` and a parent with your desired size for corner-to-corner fill.
 
 ## Headless usage
@@ -55,7 +57,7 @@ const svg = renderSvg({ width: 1200, height: 380, layers: 7, seed: 1337 });
 
 ## API
 - `CloudMaker` props mirror engine config plus layout helpers:
-  - `animate`, `phase`, `morphT`, `cycleIndex`, `className`, `style`, `fit`, `background`
+  - `animate`, `phase`, `morphT`, `cycleIndex`, `className`, `style`, `fit`, `background`, `seamlessLoop`
 - `createCloudEngine(config)` → `{ pathsAt, svgAt, width, height, blur, config }`
 - `renderSvg(config, { phase, morphT, cycleIndex })` → string
 
@@ -86,7 +88,26 @@ const svg = renderSvg({ width: 1200, height: 380, layers: 7, seed: 1337 });
   amplitudeEnvelopeCycles: 10,
   peakRoundness: 0.8,
   peakRoundnessPower: 10,
+  seamlessLoop: true,
+  background: false,
 }
+```
+
+## Solid background
+
+Provide an HSL or hex color to enable the solid background inside the SVG:
+
+```tsx
+<CloudMaker background="hsl(210deg 60% 12%)" />
+<CloudMaker background="#0b1530" />
+```
+
+## Seamless morph loop
+
+Morphing uses a cosine window and fixed fields when `seamlessLoop` is true, producing a clean loop with no reseed seam:
+
+```tsx
+<CloudMaker morphStrength={0.35} morphPeriodSec={18} seamlessLoop />
 ```
 
 ## Contributing & Publishing

@@ -34,7 +34,63 @@ function mulberry32(a) {
   };
 }
 function createCloudEngine(opts = {}) {
-  const o = { width: 1200, height: 380, layers: 7, segments: 450, baseAmplitude: 16, baseFrequency: 0.03, baseRandom: 6, layerAmplitudeStep: 2.6, layerFrequencyStep: 4e-3, layerRandomStep: 1.2, layerVerticalSpacing: 16, secondaryWaveFactor: 0.45, baseColor: "#ffffff", layerColors: [], blur: 2.2, seed: 1337, waveForm: "sincos", noiseSmoothness: 0.45, amplitudeJitter: 0, amplitudeJitterScale: 0.25, curveType: "spline", curveTension: 0.85, peakStability: 1, peakNoiseDamping: 1, peakNoisePower: 4, peakHarmonicDamping: 1, useSharedBaseline: true, morphStrength: 0, morphPeriodSec: 18, amplitudeEnvelopeStrength: 0.3, amplitudeEnvelopeCycles: 4, peakRoundness: 0.3, peakRoundnessPower: 2, amplitudeLayerCycleVariance: 0.2, ...opts };
+  const o = {
+    width: 1200,
+    height: 380,
+    layers: 7,
+    segments: 450,
+    baseAmplitude: 16,
+    baseFrequency: 0.03,
+    baseRandom: 6,
+    layerAmplitudeStep: 2.6,
+    layerFrequencyStep: 4e-3,
+    layerRandomStep: 1.2,
+    layerVerticalSpacing: 16,
+    secondaryWaveFactor: 0.45,
+    baseColor: "#ffffff",
+    layerColors: [],
+    blur: 2.2,
+    seed: 1337,
+    // New physicality controls
+    waveForm: "sincos",
+    // 'sin' | 'cos' | 'sincos'
+    noiseSmoothness: 0.45,
+    // 0..1 moving-average smoothing on noise
+    amplitudeJitter: 0,
+    // 0..1 multiplicative jitter on amplitude
+    amplitudeJitterScale: 0.25,
+    // 0..1 fraction of segments for jitter correlation length
+    curveType: "spline",
+    // 'linear' | 'spline'
+    curveTension: 0.85,
+    // 0..1, higher means smoother curves
+    peakStability: 1,
+    // 0..1, 1 = fully co-moving noise/jitter (no peak jiggle)
+    peakNoiseDamping: 1,
+    // 0..1, reduce noise & amp jitter near wave peaks
+    peakNoisePower: 4,
+    // >=1, shaping power for damping falloff
+    peakHarmonicDamping: 1,
+    // 0..1, reduce secondary harmonic near peaks
+    useSharedBaseline: true,
+    // if true, all layers close to the same baseline to avoid checkerboard overlaps
+    // Creation-time variation only
+    morphStrength: 0,
+    // 0..1, set 0 to freeze shape post creation
+    morphPeriodSec: 18,
+    // seconds for a full morph loop
+    amplitudeEnvelopeStrength: 0.3,
+    // 0..1 envelope modulation at creation
+    amplitudeEnvelopeCycles: 4,
+    // number of envelope cycles across width
+    peakRoundness: 0.3,
+    // 0..1 extra local smoothing at crests/troughs
+    peakRoundnessPower: 2,
+    // >=1 tightness of peak-local smoothing
+    amplitudeLayerCycleVariance: 0.2,
+    // 0..1 per-layer amplitude scale variance per cycle
+    ...opts
+  };
   const center = o.width / 2;
   const rand = mulberry32(o.seed >>> 0 || 1);
   const phases = Array.from({ length: o.layers }, () => rand() * Math.PI * 2);
@@ -117,8 +173,19 @@ function createCloudEngine(opts = {}) {
     const v1 = arr[wrapIndex(i1, len)];
     return v0 * (1 - t) + v1 * t;
   };
-  const sampleMorph = (arrA, arrB, x, m) => (1 - m) * sampleWrapped(arrA, x) + m * sampleWrapped(arrB, x);
-  const params = (i) => ({ baseLine: o.height - i * o.layerVerticalSpacing, amp: o.baseAmplitude + i * o.layerAmplitudeStep, freq: o.baseFrequency + i * o.layerFrequencyStep, rndF: o.baseRandom + i * o.layerRandomStep, phi: phases[i], noise: cachedFields.noisesA[i] });
+  const sampleMorph = (arrA, arrB, x, m) => {
+    return (1 - m) * sampleWrapped(arrA, x) + m * sampleWrapped(arrB, x);
+  };
+  const params = (i) => ({
+    // Top-line baseline controls the vertical placement of the wave crest for this layer
+    baseLine: o.height - i * o.layerVerticalSpacing,
+    amp: o.baseAmplitude + i * o.layerAmplitudeStep,
+    freq: o.baseFrequency + i * o.layerFrequencyStep,
+    rndF: o.baseRandom + i * o.layerRandomStep,
+    phi: phases[i],
+    // Use one of the precomputed noise fields as the static per-layer field
+    noise: cachedFields.noisesA[i]
+  });
   const pathFor = (i, phase, morphT = 0) => {
     const p = params(i);
     const fillBase = o.useSharedBaseline ? o.height : p.baseLine;
@@ -148,7 +215,9 @@ function createCloudEngine(opts = {}) {
       const mixedNoise = ((1 - o.peakStability) * (p.noise[k] || 0) + o.peakStability * stableNoise) * noiseScale;
       const mixedAmpMod = ((1 - o.peakStability) * (cachedFields.ampModsA[i][k] || 0) + o.peakStability * stableAmpMod) * noiseScale;
       const envStrength = o.amplitudeEnvelopeStrength * (0.9 + 0.2 * (i * 16807 % 11) / 10);
-      const env2 = 1 + envStrength * Math.sin(2 * Math.PI * o.amplitudeEnvelopeCycles * (dist - phase) / Math.max(1, o.width) + (cachedFields.envelopePhases[i] + i * 0.37));
+      const env2 = 1 + envStrength * Math.sin(
+        2 * Math.PI * o.amplitudeEnvelopeCycles * (dist - phase) / Math.max(1, o.width) + (cachedFields.envelopePhases[i] + i * 0.37)
+      );
       const baseAmp = p.amp * (cachedFields.ampLayerScale[i] || 1) * env2;
       const ampMult = 1 + o.amplitudeJitter * mixedAmpMod;
       const w = baseAmp * ampMult * wave + mixedNoise * p.rndF;
@@ -198,10 +267,14 @@ function createCloudEngine(opts = {}) {
   };
   const pathsAt = (phase = 0, morphT = 0, cycleIndex = 0) => {
     ensureFields(Math.max(0, Math.floor(cycleIndex)));
-    return Array.from({ length: o.layers }, (_, i) => ({ d: pathFor(i, phase, morphT), fill: colorAt(i), opacity: +(1 - i * 0.12).toFixed(2) }));
+    return Array.from({ length: o.layers }, (_, i) => ({
+      d: pathFor(i, phase, morphT),
+      fill: colorAt(i),
+      opacity: +(1 - i * 0.12).toFixed(2)
+    }));
   };
-  const svgAt = (phase = 0, morphT = 0, cycleIndex = 0) => {
-    const paths = pathsAt(phase, morphT, cycleIndex).map((p) => `<path d="${p.d}" fill="${p.fill}" fill-opacity="${p.opacity}"/>`).join("\n      ");
+  const svgAt = (phase = 0) => {
+    const paths = pathsAt(phase).map((p) => `<path d="${p.d}" fill="${p.fill}" fill-opacity="${p.opacity}"/>`).join("\n      ");
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${o.width} ${o.height}">
       <defs>
         <filter id="cloud-blur" x="-20%" y="-20%" width="140%" height="140%">
@@ -273,6 +346,7 @@ var CloudMaker = ({
   amplitudeEnvelopeCycles = 10,
   peakRoundness = 0.8,
   peakRoundnessPower = 10,
+  seamlessLoop = true,
   animate = true,
   phase = 0,
   morphT = 0,
@@ -298,13 +372,13 @@ var CloudMaker = ({
       const phase2 = speed * elapsedSec;
       const period = Math.max(1e-4, engine.config.morphPeriodSec);
       const morphT2 = elapsedSec / period % 1;
-      const cycleIndex2 = Math.floor(elapsedSec / period);
+      const cycleIndex2 = seamlessLoop ? 0 : Math.floor(elapsedSec / period);
       engine.pathsAt(phase2, morphT2, cycleIndex2).forEach((p, i) => refs.current[i]?.setAttribute("d", p.d));
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [engine, speed, animate]);
+  }, [engine, speed, animate, seamlessLoop]);
   const preserve = fit === "stretch" ? "none" : fit === "slice" ? "xMidYMid slice" : "xMidYMid meet";
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
     "svg",
