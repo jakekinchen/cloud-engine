@@ -15,6 +15,7 @@ export type ControlSchemaBase = {
   disabled?: boolean;
   accentColor?: string;
   size?: 'sm' | 'md' | 'lg';
+  fullRow?: boolean;
 };
 
 export type ControlSchema = ControlSchemaBase & {

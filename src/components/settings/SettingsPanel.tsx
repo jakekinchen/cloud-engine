@@ -56,7 +56,7 @@ export const SettingsPanel: React.FC<PanelProps> = ({ sections, controls, classN
               <div
                 key={ctrl.id}
                 style={{
-                  gridColumn: (ctrl as any).fullRow ? '1 / -1' : undefined,
+                  gridColumn: ctrl.fullRow ? '1 / -1' : undefined,
                   borderRadius: 10,
                   padding: 12,
                   background: 'rgba(255,255,255,.04)',

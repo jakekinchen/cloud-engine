@@ -178,7 +178,7 @@ export function getPalette(name: string, layers: number, opts: GetPaletteOptions
 
 export const paletteNames = Object.keys(curatedPalettes);
 
-export function gradientToCSS(bg: BackgroundSpec, overlayOpacityScale = 1) {
+export function gradientToCSS(bg: BackgroundSpec) {
   const mk = (b: BackgroundSpec) => `linear-gradient(${b.angle}deg, ${b.stops.map(s => `${s.color} ${s.pos}%`).join(', ')})`;
   const base = mk(bg);
   if (!bg.overlay) return base;
@@ -241,7 +241,7 @@ function applyAdjust(hex: string, adj: ThemeAdjust): string {
 
 function adjustColors(colors: string[], adj: ThemeAdjust, layers: number): string[] {
   const out = colors.map((c, i) => {
-    let a: ThemeAdjust = { ...adj };
+    const a: ThemeAdjust = { ...adj };
     if (adj.alternateLayerHueDelta && i % 2 === 1) a.hueShiftDeg = (a.hueShiftDeg ?? 0) + adj.alternateLayerHueDelta;
     if (adj.alternateLayerSaturationScale && i % 2 === 1) a.saturationScale = (a.saturationScale ?? 1) * adj.alternateLayerSaturationScale;
     return applyAdjust(c, a);

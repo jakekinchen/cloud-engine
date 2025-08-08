@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const json = await fs.readFile(FILE_PATH, 'utf8');
     return NextResponse.json(JSON.parse(json), { status: 200 });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Failed to read defaults' }, { status: 500 });
   }
 }
@@ -29,7 +29,7 @@ export async function PUT(req: Request) {
     const pretty = JSON.stringify(next, null, 2) + '\n';
     await fs.writeFile(FILE_PATH, pretty, 'utf8');
     return NextResponse.json(next, { status: 200 });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Failed to write defaults' }, { status: 500 });
   }
 }

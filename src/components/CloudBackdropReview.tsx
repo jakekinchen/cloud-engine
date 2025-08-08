@@ -6,7 +6,7 @@ import Icon from './icons';
 import SettingsPanel from './settings/SettingsPanel';
 import type { SectionSchema, ControlSchema } from './settings/types';
 import { getThemePalette, interpolateThemePalettes, paletteNames } from '@/utils/palettes';
-import { defaultCloudDefaults, loadCloudDefaults, fetchCloudDefaults, persistCloudDefaults } from '@/config/cloudDefaults';
+import { defaultCloudDefaults, fetchCloudDefaults, persistCloudDefaults } from '@/config/cloudDefaults';
 
 type Num = number;
 const clamp = (n: Num, a: Num, b: Num) => (n < a ? a : n > b ? b : n);
@@ -73,7 +73,7 @@ const Range: React.FC<{
   </div>
 );
 
-type Init = Partial<{
+export type Init = Partial<{
   width: number; height: number; layers: number; segments: number; baseColor: string;
   speed: number; seed: number; blur: number;
   waveForm: 'sin' | 'cos' | 'sincos';
@@ -262,7 +262,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       lightness, contrast, altHueDelta, altSatScale, defaultPaletteColors,
     });
   }, [
-    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, layers
+    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale
   ]);
 
   // Sunset palette auto-cycling with smooth transitions

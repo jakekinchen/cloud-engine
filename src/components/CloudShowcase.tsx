@@ -2,6 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import type { Init as CloudInit } from './CloudBackdropReview';
 
 const CloudBackdropReview = dynamic(() => import('./CloudBackdropReview'), {
   ssr: false,
@@ -10,7 +11,7 @@ const CloudBackdropReview = dynamic(() => import('./CloudBackdropReview'), {
 
 type Props = {
   className?: string;
-  initial?: Parameters<typeof CloudBackdropReview>[0]['initial'];
+  initial?: CloudInit;
 };
 
 const CloudShowcase: React.FC<Props> = ({ className, initial }) => {
