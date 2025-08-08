@@ -27,7 +27,7 @@ const CloudShowcase: React.FC<Props> = ({ className, initial }) => {
       }}
     >
       <div style={{ width: 'min(100%, 1200px)', margin: '0 auto' }}>
-        <CloudBackdropReview initial={initial} />
+        <CloudBackdropReview {...(initial !== undefined ? { initial } : {})} />
       </div>
     </div>
   );

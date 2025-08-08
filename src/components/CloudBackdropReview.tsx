@@ -16,7 +16,11 @@ function useElementWidth<T extends HTMLElement>(): [React.RefObject<T | null>, n
   const [w, setW] = useState(0);
   useEffect(() => {
     if (!ref.current) return;
-    const obs = new ResizeObserver(([e]) => setW(e.contentRect.width));
+    const obs = new ResizeObserver(entries => {
+      const entry = entries[0];
+      if (!entry) return;
+      setW(entry.contentRect.width);
+    });
     obs.observe(ref.current);
     return () => obs.disconnect();
   }, []);
@@ -200,6 +204,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [cloudsEnabled, setCloudsEnabled] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
+  // Background glow controls
+  const [backgroundGlowEnabled, setBackgroundGlowEnabled] = useState(true);
+  const [bgGlowIntensity, setBgGlowIntensity] = useState(1);
+  const [bgGlowHueShift, setBgGlowHueShift] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -285,6 +293,49 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
     return () => cancelAnimationFrame(raf);
   }, [sunsetMode, autoCyclePalettes, sunsetPeriodSec]);
 
+  // Helpers for background CSS composition
+  const mkLinear = (angle: number, stops: { color: string; pos: number }[]) =>
+    `linear-gradient(${angle}deg, ${stops.map(s => `${s.color} ${s.pos}%`).join(', ')})`;
+  const parseHex = (hex: string) => {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    let a = 255;
+    if (h.length === 8) {
+      a = parseInt(h.slice(6, 8), 16);
+      h = h.slice(0, 6);
+    }
+    const n = parseInt(h, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a };
+  };
+  const toRgba = (r: number, g: number, b: number, a01: number) => `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Math.max(0, Math.min(1, a01)).toFixed(3)})`;
+  const hexToHsl = (hex: string) => {
+    const { r, g, b } = parseHex(hex);
+    const rr = r / 255, gg = g / 255, bb = b / 255;
+    const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb);
+    let h = 0; const l = (max + min) / 2; let s = 0;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case rr: h = (gg - bb) / d + (gg < bb ? 6 : 0); break;
+        case gg: h = (bb - rr) / d + 2; break;
+        case bb: h = (rr - gg) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s, l };
+  };
+  const hslToHex = ({ h, s, l }: { h: number; s: number; l: number }) => {
+    const c = (n: number) => Math.round(n).toString(16).padStart(2, '0');
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) => {
+      const k = (n + h / 30) % 12;
+      const col = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+      return col * 255;
+    };
+    return `#${c(f(0))}${c(f(8))}${c(f(4))}`;
+  };
+
   const containerStyle: React.CSSProperties = useMemo(() => {
     let bg = 'linear-gradient(180deg, #071122 0%, #0b1530 60%, #0e1838 100%)';
     if (sunsetMode) {
@@ -303,7 +354,37 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       } else {
         theme = getThemePalette(paletteNames[paletteIndex % paletteNames.length] || 'sunset', layers);
       }
-      if (theme.backgroundCSS) bg = theme.backgroundCSS;
+      if (theme.backgroundCSS) {
+        // Compose background base and overlay with optional glow controls
+        const spec = theme.spec?.background;
+        if (spec) {
+          const baseCSS = mkLinear(spec.angle, spec.stops);
+          const mkOverlay = (intensity: number) => {
+            if (!spec.overlay) return undefined;
+            const stops = spec.overlay.stops.map(s => {
+              const { r, g, b, a } = parseHex(s.color);
+              const hsl = hexToHsl(s.color);
+              const hh = (hsl.h + bgGlowHueShift + 360) % 360;
+              const shiftedHex = hslToHex({ h: hh, s: hsl.s, l: hsl.l });
+              const rgb = parseHex(shiftedHex);
+              const alpha = Math.max(0, Math.min(1, (a / 255) * intensity));
+              return { color: toRgba(rgb.r, rgb.g, rgb.b, alpha), pos: s.pos };
+            });
+            return mkLinear(spec.overlay.angle ?? spec.angle, stops);
+          };
+          if (!backgroundGlowEnabled) {
+            bg = baseCSS;
+          } else {
+            const i1 = Math.min(1, Math.max(0, bgGlowIntensity));
+            const i2 = Math.max(0, Math.min(1, bgGlowIntensity - 1));
+            const ov1 = mkOverlay(i1);
+            const ov2 = i2 > 0 ? mkOverlay(i2) : undefined;
+            bg = [ov2, ov1, baseCSS].filter(Boolean).join(', ');
+          }
+        } else {
+          bg = theme.backgroundCSS;
+        }
+      }
     }
     return {
       width: '66.666%',
@@ -313,7 +394,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       overflow: 'hidden',
       background: bg
     };
-  }, [height, sunsetMode, paletteIndex, layers, autoCyclePalettes, smoothTransitionT, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale]);
+  }, [height, sunsetMode, paletteIndex, layers, autoCyclePalettes, smoothTransitionT, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]);
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr auto 1fr', minHeight: '100vh', width: '100%' }}>
@@ -359,14 +440,14 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
 
         return cloudsEnabled && mounted ? (
       <CloudBackdrop
-        key={`${sunsetMode ? 'sun' : 'base'}-${paletteIndex}-${layers}-${baseColor}`}
+        key={`${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
         width={width}
         height={height}
         layers={layers}
         segments={segments}
         baseColor={effectiveBaseColor}
-        layerColors={effectiveLayerColors}
-        layerOpacities={effectiveLayerOpacities}
+        {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
+        {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
         speed={paused ? 0 : speed}
         seed={seed}
         blur={blur}
@@ -406,8 +487,9 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'appearance', title: 'Appearance', order: 2 },
             { id: 'motion', title: 'Motion & Shape', order: 3 },
             { id: 'compositing', title: 'Compositing & Baseline', order: 4 },
-            { id: 'variation', title: 'Variation', order: 5 },
-            { id: 'palette', title: 'Palette Adjustments', order: 6 },
+              { id: 'variation', title: 'Variation', order: 5 },
+              { id: 'palette', title: 'Palette Adjustments', order: 6 },
+              { id: 'background', title: 'Background Glow', order: 7 },
           ];
            const controls: ControlSchema[] = [
             { id: 'actions-top', label: 'Actions', sectionId: 'key', order: 0, type: 'buttons', fullRow: true, render: () => (
@@ -429,7 +511,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     setPeakRoundness(0.8); setPeakRoundnessPower(10);
                     setSunsetMode(false); setPaletteIndex(0);
                   }}>reset</button>
-                  <button style={btn} onClick={handleSaveTsx}>save .tsx</button>
+                  <button style={btn} onClick={handleSaveTsx}>save</button>
                 </div>
               </Row>
             ) },
@@ -496,6 +578,11 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'altdh', label: 'Alt hue Δ (odd layers)', sectionId: 'palette', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Alt hue Δ (odd layers)" icon={<Icon.layers size={14} />}><Range min={-90} max={90} step={1} value={altHueDelta} onChange={setAltHueDelta} /></Row> },
             { id: 'altds', label: 'Alt sat × (odd layers)', sectionId: 'palette', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Alt sat × (odd layers)" icon={<Icon.layers size={14} />}><Range min={0.5} max={1.5} step={0.01} value={altSatScale} onChange={setAltSatScale} /></Row> },
             { id: 'seed', label: 'Seed', sectionId: 'variation', order: 98, type: 'button', render: () => <Row label="Seed" right={<button style={btn} onClick={shuffle}>shuffle</button>}><input type="number" value={seed} onChange={e => setSeed(clamp(+e.target.value || 0, 0, 2 ** 31 - 1))} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }} /></Row> },
+
+            // Background controls
+            { id: 'bg-toggle', label: 'Glow enabled', sectionId: 'background', order: 1, type: 'toggle', render: () => <Row label="Glow enabled" right={<Toggle checked={backgroundGlowEnabled} onChange={setBackgroundGlowEnabled} />} /> },
+            { id: 'bg-intensity', label: 'Glow intensity', sectionId: 'background', order: 2, type: 'slider', fullRow: true, render: () => <Row label="Glow intensity"><Range min={0} max={2} step={0.01} value={bgGlowIntensity} onChange={setBgGlowIntensity} /></Row> },
+            { id: 'bg-hue', label: 'Glow hue shift', sectionId: 'background', order: 3, type: 'slider', fullRow: true, render: () => <Row label="Glow hue shift"><Range min={-180} max={180} step={1} value={bgGlowHueShift} onChange={setBgGlowHueShift} /></Row> },
           ];
           return <SettingsPanel sections={sections} controls={controls} />;
         })()}

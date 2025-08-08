@@ -67,8 +67,59 @@ const CloudBackdrop: React.FC<Props> = ({
   className
 }) => {
   const engine = useMemo(
-    () => createCloudEngine({ width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower }),
-    [width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower]
+    () =>
+      createCloudEngine({
+        width,
+        height,
+        layers,
+        segments,
+        baseColor,
+        seed,
+        blur,
+        waveForm,
+        noiseSmoothness,
+        amplitudeJitter,
+        amplitudeJitterScale,
+        curveType,
+        curveTension,
+        peakStability,
+        peakNoiseDamping,
+        peakNoisePower,
+        peakHarmonicDamping,
+        useSharedBaseline,
+        morphStrength,
+        morphPeriodSec,
+        amplitudeEnvelopeStrength,
+        amplitudeEnvelopeCycles,
+        peakRoundness,
+        peakRoundnessPower,
+      }),
+    [
+      width,
+      height,
+      layers,
+      segments,
+      baseColor,
+      seed,
+      blur,
+      waveForm,
+      noiseSmoothness,
+      amplitudeJitter,
+      amplitudeJitterScale,
+      curveType,
+      curveTension,
+      peakStability,
+      peakNoiseDamping,
+      peakNoisePower,
+      peakHarmonicDamping,
+      useSharedBaseline,
+      morphStrength,
+      morphPeriodSec,
+      amplitudeEnvelopeStrength,
+      amplitudeEnvelopeCycles,
+      peakRoundness,
+      peakRoundnessPower,
+    ]
   );
 
   const initial = useMemo(() => engine.pathsAt(0, 0, 0), [engine]);
@@ -112,7 +163,7 @@ const CloudBackdrop: React.FC<Props> = ({
             key={i}
             ref={el => { if (el) refs.current[i] = el; }}
             d={p.d}
-            fill={p.fill}
+            fill={layerColors?.[i] ?? p.fill}
             fillOpacity={layerOpacities?.[i] ?? (additiveBlending ? Math.max(0.06, (i + 1) / (engine.config.layers || initial.length) * 0.7) : p.opacity)}
           />
         ))}

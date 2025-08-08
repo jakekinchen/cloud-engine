@@ -77,7 +77,6 @@ export const defaultCloudDefaults: CloudDefaults = {
   contrast: 0,
   altHueDelta: 0,
   altSatScale: 1,
-  defaultPaletteColors: undefined,
 };
 
 export function loadCloudDefaults(): CloudDefaults {

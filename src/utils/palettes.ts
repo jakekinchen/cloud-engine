@@ -137,18 +137,25 @@ function rgbToHex(r: number, g: number, b: number) {
 
 // Resample a palette to N entries via linear interpolation in RGB
 function resampleColors(colors: string[], layers: number): string[] {
-  if (colors.length === layers) return colors.slice();
-  if (layers <= 1) return [colors[0]];
+  const source = colors.length > 0 ? colors : ['#ffffff'];
+  if (source.length === layers) return source.slice();
+  if (layers <= 1) return [source[0] ?? '#ffffff'];
   const result: string[] = [];
   for (let i = 0; i < layers; i++) {
     const t = i / Math.max(1, layers - 1);
-    const f = t * (colors.length - 1);
+    const f = t * (source.length - 1);
     const i0 = Math.floor(f);
-    const i1 = Math.min(colors.length - 1, i0 + 1);
+    const i1 = Math.min(source.length - 1, i0 + 1);
     const tt = f - i0;
-    const c0 = parseHex(colors[i0]);
-    const c1 = parseHex(colors[i1]);
-    result.push(rgbToHex(lerp(c0.r, c1.r, tt), lerp(c0.g, c1.g, tt), lerp(c0.b, c1.b, tt)));
+    const c0 = parseHex(source[i0] ?? source[0] ?? '#ffffff');
+    const c1 = parseHex(source[i1] ?? source[i0] ?? source[0] ?? '#ffffff');
+    result.push(
+      rgbToHex(
+        lerp(c0.r, c1.r, tt),
+        lerp(c0.g, c1.g, tt),
+        lerp(c0.b, c1.b, tt)
+      )
+    );
   }
   return result;
 }
@@ -159,7 +166,7 @@ export type GetPaletteOptions = {
 };
 
 export function getPalette(name: string, layers: number, opts: GetPaletteOptions = {}) {
-  const spec = curatedPalettes[name] ?? curatedPalettes.sunset;
+  const spec = curatedPalettes[name] ?? curatedPalettes.sunset!;
   const colors = resampleColors(spec.colors, layers);
   if (opts.reverse) colors.reverse();
   const op = spec.opacities ? resampleColors(spec.opacities.map(x => `#${Math.round((+x * 255)).toString(16).padStart(2,'0').repeat(3)}`), layers)
@@ -252,11 +259,19 @@ function adjustColors(colors: string[], adj: ThemeAdjust, layers: number): strin
 function adjustBackgroundCSS(bg: BackgroundSpec | undefined, adj: ThemeAdjust): string | undefined {
   if (!bg) return undefined;
   const tweak = (c: string) => applyAdjust(c, adj);
-  const base: BackgroundSpec = {
+  const overlay = bg.overlay
+    ? {
+        ...(bg.overlay.angle !== undefined ? { angle: bg.overlay.angle } : {}),
+        stops: bg.overlay.stops.map(s => ({ color: tweak(s.color), pos: s.pos })),
+      }
+    : undefined;
+  const baseWithoutOverlay: BackgroundSpec = {
     angle: bg.angle,
     stops: bg.stops.map(s => ({ color: tweak(s.color), pos: s.pos })),
-    overlay: bg.overlay ? { angle: bg.overlay.angle, stops: bg.overlay.stops.map(s => ({ color: tweak(s.color), pos: s.pos })) } : undefined
   };
+  const base: BackgroundSpec = overlay
+    ? { ...baseWithoutOverlay, overlay }
+    : baseWithoutOverlay;
   return gradientToCSS(base);
 }
 
@@ -264,7 +279,7 @@ export function getThemePalette(name: string, layers: number, opts: GetPaletteOp
   const spec = curatedPalettes[name] ?? curatedPalettes.sunset;
   const { colors, opacities } = getPalette(name, layers, opts);
   const adjustedColors = adjust ? adjustColors(colors, adjust, layers) : colors;
-  const backgroundCSS = spec.background ? (adjust ? adjustBackgroundCSS(spec.background, adjust) : gradientToCSS(spec.background)) : undefined;
+  const backgroundCSS = spec?.background ? (adjust ? adjustBackgroundCSS(spec.background, adjust) : gradientToCSS(spec.background)) : undefined;
   return { colors: adjustedColors, opacities, backgroundCSS, spec };
 }
 
@@ -280,65 +295,24 @@ export function interpolateThemePalettes(
   const toPalette = getThemePalette(toName, layers, opts, adjust);
   
   const interpolatedColors = fromPalette.colors.map((fromColor, i) => {
-    const toColor = toPalette.colors[i];
-    const from = parseHex(fromColor);
-    const to = parseHex(toColor);
-    return rgbToHex(
-      lerp(from.r, to.r, t),
-      lerp(from.g, to.g, t),
-      lerp(from.b, to.b, t)
-    );
+    const toColor = toPalette.colors[i] ?? toPalette.colors[toPalette.colors.length - 1] ?? '#ffffff';
+    const a = hexToHsl(fromColor);
+    const b = hexToHsl(toColor);
+    const dh = ((b.h - a.h + 540) % 360) - 180; // shortest hue path
+    const h = (a.h + dh * t + 360) % 360;
+    const s = lerp(a.s, b.s, t);
+    const l = lerp(a.l, b.l, t);
+    return hslToHex({ h, s, l });
   });
   
   const interpolatedOpacities = fromPalette.opacities.map((fromOpacity, i) => 
-    lerp(fromOpacity, toPalette.opacities[i], t)
+    lerp(fromOpacity, toPalette.opacities[i] ?? toPalette.opacities[toPalette.opacities.length - 1] ?? fromOpacity, t)
   );
-  
-  let interpolatedBackgroundCSS: string | undefined;
-  if (fromPalette.backgroundCSS && toPalette.backgroundCSS) {
-    const fromSpec = curatedPalettes[fromName]?.background;
-    const toSpec = curatedPalettes[toName]?.background;
-    if (fromSpec && toSpec) {
-      const interpolatedBg: BackgroundSpec = {
-        angle: lerp(fromSpec.angle, toSpec.angle, t),
-        stops: fromSpec.stops.map((fromStop, i) => {
-          const toStop = toSpec.stops[i] || toSpec.stops[toSpec.stops.length - 1];
-          const fromColor = parseHex(fromStop.color);
-          const toColor = parseHex(toStop.color);
-          return {
-            color: rgbToHex(
-              lerp(fromColor.r, toColor.r, t),
-              lerp(fromColor.g, toColor.g, t),
-              lerp(fromColor.b, toColor.b, t)
-            ),
-            pos: lerp(fromStop.pos, toStop.pos, t)
-          };
-        }),
-        overlay: fromSpec.overlay && toSpec.overlay ? {
-          angle: lerp(fromSpec.overlay.angle || fromSpec.angle, toSpec.overlay.angle || toSpec.angle, t),
-          stops: fromSpec.overlay.stops.map((fromStop, i) => {
-            const toStop = toSpec.overlay!.stops[i] || toSpec.overlay!.stops[toSpec.overlay!.stops.length - 1];
-            const fromColor = parseHex(fromStop.color);
-            const toColor = parseHex(toStop.color);
-            return {
-              color: rgbToHex(
-                lerp(fromColor.r, toColor.r, t),
-                lerp(fromColor.g, toColor.g, t),
-                lerp(fromColor.b, toColor.b, t)
-              ),
-              pos: lerp(fromStop.pos, toStop.pos, t)
-            };
-          })
-        } : undefined
-      };
-      interpolatedBackgroundCSS = adjust ? adjustBackgroundCSS(interpolatedBg, adjust) : gradientToCSS(interpolatedBg);
-    }
-  }
   
   return {
     colors: interpolatedColors,
     opacities: interpolatedOpacities,
-    backgroundCSS: interpolatedBackgroundCSS || fromPalette.backgroundCSS,
+    backgroundCSS: fromPalette.backgroundCSS,
     spec: fromPalette.spec
   };
 }
