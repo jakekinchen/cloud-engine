@@ -32,6 +32,7 @@ export type CloudMakerProps = {
   amplitudeEnvelopeCycles?: number;
   peakRoundness?: number;
   peakRoundnessPower?: number;
+  seamlessLoop?: boolean;
   animate?: boolean;
   phase?: number;
   morphT?: number;
@@ -71,6 +72,7 @@ const CloudMaker: React.FC<CloudMakerProps> = ({
   amplitudeEnvelopeCycles = 10,
   peakRoundness = 0.8,
   peakRoundnessPower = 10,
+  seamlessLoop = true,
   animate = true,
   phase = 0,
   morphT = 0,
@@ -98,13 +100,13 @@ const CloudMaker: React.FC<CloudMakerProps> = ({
       const phase = speed * elapsedSec;
       const period = Math.max(0.0001, engine.config.morphPeriodSec);
       const morphT = (elapsedSec / period) % 1;
-      const cycleIndex = Math.floor(elapsedSec / period);
+      const cycleIndex = seamlessLoop ? 0 : Math.floor(elapsedSec / period);
       engine.pathsAt(phase, morphT, cycleIndex).forEach((p, i) => refs.current[i]?.setAttribute('d', p.d));
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [engine, speed, animate]);
+  }, [engine, speed, animate, seamlessLoop]);
 
   const preserve = fit === 'stretch' ? 'none' : (fit === 'slice' ? 'xMidYMid slice' : 'xMidYMid meet');
 

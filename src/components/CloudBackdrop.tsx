@@ -32,6 +32,8 @@ type Props = {
   amplitudeEnvelopeCycles?: number;   // cycles across width
   peakRoundness?: number;             // 0..1
   peakRoundnessPower?: number;        // >=1
+  seamlessLoop?: boolean;
+  background?: false | string;        // solid background inside SVG
   className?: string;
 };
 
@@ -64,6 +66,8 @@ const CloudBackdrop: React.FC<Props> = ({
   amplitudeEnvelopeCycles = 4,
   peakRoundness = 0.3,
   peakRoundnessPower = 2,
+  seamlessLoop = true,
+  background = '#0b1530',
   className
 }) => {
   const engine = useMemo(
@@ -134,13 +138,13 @@ const CloudBackdrop: React.FC<Props> = ({
       const phase = speed * elapsedSec; // outward motion
       const period = Math.max(0.0001, engine.config.morphPeriodSec);
       const morphT = (elapsedSec / period) % 1;
-      const cycleIndex = Math.floor(elapsedSec / period);
+      const cycleIndex = seamlessLoop ? 0 : Math.floor(elapsedSec / period);
       engine.pathsAt(phase, morphT, cycleIndex).forEach((p, i) => refs.current[i]?.setAttribute('d', p.d));
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [engine, speed]);
+  }, [engine, speed, seamlessLoop]);
 
   return (
     <svg
@@ -152,6 +156,9 @@ const CloudBackdrop: React.FC<Props> = ({
       suppressHydrationWarning
       aria-hidden
     >
+      {typeof background === 'string' && (
+        <rect x={0} y={0} width="100%" height="100%" fill={background} />
+      )}
       <defs>
         <filter id="cloud-blur" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation={engine.blur} />

@@ -30,6 +30,8 @@
   },
   "scripts": {
     "build": "tsup index.ts --format esm,cjs --dts --clean",
+    "preversion": "node ../scripts/sync-portable.mjs",
+    "prepack": "node ../scripts/sync-portable.mjs && npm run build",
     "prepublishOnly": "npm run build"
   }
 }

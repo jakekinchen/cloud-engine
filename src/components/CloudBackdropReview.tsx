@@ -65,7 +65,7 @@ const Range: React.FC<{
     <input
       type="range" min={min} max={max} step={step} value={value}
       onChange={e => onChange(clamp(+e.target.value, min, max))}
-      style={{ width: '100%', height: 28 }}
+      style={{ width: '100%', height: 28, accentColor: '#9cc2ff' }}
     />
     {numberBox && (
       <input
@@ -190,6 +190,11 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [amplitudeEnvelopeCycles, setAmplitudeEnvelopeCycles] = useState(initial?.amplitudeEnvelopeCycles ?? defaults.amplitudeEnvelopeCycles ?? 2);
   const [peakRoundness, setPeakRoundness] = useState(initial?.peakRoundness ?? defaults.peakRoundness ?? 0.8);
   const [peakRoundnessPower, setPeakRoundnessPower] = useState(initial?.peakRoundnessPower ?? defaults.peakRoundnessPower ?? 10);
+  const [seamlessLoop, setSeamlessLoop] = useState(true);
+  const [solidBgEnabled, setSolidBgEnabled] = useState(true);
+  const [solidBgHue, setSolidBgHue] = useState(222);
+  const [solidBgSat, setSolidBgSat] = useState(0.65);
+  const [solidBgLight, setSolidBgLight] = useState(0.14);
   const [sunsetMode, setSunsetMode] = useState(initial?.sunsetMode ?? defaults.sunsetMode ?? false);
   const [sunsetPeriodSec, setSunsetPeriodSec] = useState(initial?.sunsetPeriodSec ?? defaults.sunsetPeriodSec ?? 12);
   const [autoCyclePalettes, setAutoCyclePalettes] = useState(false);
@@ -469,6 +474,8 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
         peakRoundness={peakRoundness}
         peakRoundnessPower={peakRoundnessPower}
+        seamlessLoop={seamlessLoop}
+        background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
       />
         ) : (<div style={{ width: '100%', height }} />);
       })()}
@@ -489,13 +496,37 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'compositing', title: 'Compositing & Baseline', order: 4 },
               { id: 'variation', title: 'Variation', order: 5 },
               { id: 'palette', title: 'Palette Adjustments', order: 6 },
-              { id: 'background', title: 'Background Glow', order: 7 },
+              { id: 'background', title: 'Background', order: 7 },
           ];
            const controls: ControlSchema[] = [
             { id: 'actions-top', label: 'Actions', sectionId: 'key', order: 0, type: 'buttons', fullRow: true, render: () => (
               <Row label="Actions">
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button style={btn} onClick={() => setPaused(p => !p)}>{paused ? 'resume' : 'pause'}</button>
+                  <button style={btn} onClick={() => {
+                    // Randomize UI-focused values only; keep height, speed, blur, structure knobs unchanged
+                    setSeed(Math.floor(Math.random() * 1e9));
+                    setBaseColor(`#${Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6,'0')}`);
+                    // Palette-related
+                    setPaletteIndex(Math.floor(Math.random() * paletteNames.length));
+                    setHueShift(Math.floor(Math.random() * 361) - 180);
+                    setSaturation(Math.round((0.5 + Math.random() * 1.5) * 100) / 100);
+                    setLightness(Math.round(((Math.random() - 0.5)) * 100) / 100);
+                    setContrast(Math.round(((Math.random() - 0.5) * 2) * 100) / 100);
+                    setAltHueDelta(Math.floor(Math.random() * 181) - 90);
+                    setAltSatScale(Math.round((0.5 + Math.random()) * 100) / 100);
+                    // Sunset options
+                    setSunsetMode(Math.random() < 0.5);
+                    setSunsetPeriodSec(6 + Math.floor(Math.random() * 30));
+                    // Solid background HSL
+                    setSolidBgEnabled(Math.random() < 0.7);
+                    setSolidBgHue(Math.floor(Math.random() * 360));
+                    setSolidBgSat(Math.round((0.3 + Math.random() * 0.7) * 100) / 100);
+                    setSolidBgLight(Math.round((0.05 + Math.random() * 0.25) * 100) / 100);
+                    // Morph (optional UI feel)
+                    setMorphStrength(Math.round(Math.random() * 100) / 100);
+                    setMorphPeriodSec(6 + Math.floor(Math.random() * 30));
+                  }}>randomize</button>
                   <button style={btn} onClick={() => {
                     setLayers(7); setSegments(450); setHeight(380);
                     setSpeed(60); setBlur(2.2); setBaseColor('#ffffff'); setSeed(1337); setPaused(false);
@@ -517,6 +548,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             ) },
             { id: 'static', label: 'Static peaks', sectionId: 'key', order: 1, type: 'toggle', render: () => <Row label="Static peaks" icon={<Icon.toggle size={16} />} right={<Toggle checked={staticPeaks} onChange={setStaticPeaks} />} /> },
             { id: 'clouds', label: 'Clouds on/off', sectionId: 'key', order: 2, type: 'toggle', render: () => <Row label="Clouds on/off" icon={<Icon.wave size={16} />} right={<Toggle checked={cloudsEnabled} onChange={setCloudsEnabled} />} /> },
+            { id: 'seamless', label: 'Seamless morph loop', sectionId: 'key', order: 3, type: 'toggle', render: () => <Row label="Seamless morph loop" icon={<Icon.toggle size={16} />} right={<Toggle checked={seamlessLoop} onChange={setSeamlessLoop} />} /> },
             { id: 'amp-env', label: 'Amp envelope', sectionId: 'key', order: 3, type: 'slider', fullRow: true, render: () => <Row label="Amp envelope"><Range min={0} max={1} step={0.02} value={amplitudeEnvelopeStrength} onChange={setAmplitudeEnvelopeStrength} /></Row> },
             { id: 'env-cycles', label: 'Envelope cycles', sectionId: 'key', order: 4, type: 'slider', fullRow: true, render: () => <Row label="Envelope cycles"><Range min={1} max={10} step={1} value={amplitudeEnvelopeCycles} onChange={setAmplitudeEnvelopeCycles} /></Row> },
             // removed peak roundness and roundness power per UX request
@@ -571,18 +603,22 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
               </div>
             ) },
             { id: 'cycle', label: 'Auto-cycle palettes', sectionId: 'variation', order: 6, type: 'toggle', render: () => <Row label="Auto-cycle palettes" right={<Toggle checked={autoCyclePalettes} onChange={setAutoCyclePalettes} />} /> },
-            { id: 'hue', label: 'Hue shift', sectionId: 'palette', order: 1, type: 'slider', fullRow: true, render: () => <Row label="Hue shift" icon={<Icon.palette size={14} />}><Range min={-180} max={180} step={1} value={hueShift} onChange={setHueShift} /></Row> },
-            { id: 'sat', label: 'Saturation', sectionId: 'palette', order: 2, type: 'slider', fullRow: true, render: () => <Row label="Saturation" icon={<Icon.palette size={14} />}><Range min={0} max={2} step={0.02} value={saturation} onChange={setSaturation} /></Row> },
-            { id: 'light', label: 'Lightness', sectionId: 'palette', order: 3, type: 'slider', fullRow: true, render: () => <Row label="Lightness" icon={<Icon.palette size={14} />}><Range min={-0.5} max={0.5} step={0.01} value={lightness} onChange={setLightness} /></Row> },
-            { id: 'ctr', label: 'Contrast', sectionId: 'palette', order: 4, type: 'slider', fullRow: true, render: () => <Row label="Contrast" icon={<Icon.palette size={14} />}><Range min={-1} max={1} step={0.02} value={contrast} onChange={setContrast} /></Row> },
+            { id: 'hue', label: 'Hue shift', sectionId: 'palette', order: 1, type: 'slider', colSpan: 2, render: () => <Row label="Hue shift" icon={<Icon.palette size={14} />}><Range min={-180} max={180} step={1} value={hueShift} onChange={setHueShift} /></Row> },
+            { id: 'sat', label: 'Saturation', sectionId: 'palette', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Saturation" icon={<Icon.palette size={14} />}><Range min={0} max={2} step={0.02} value={saturation} onChange={setSaturation} /></Row> },
+            { id: 'light', label: 'Lightness', sectionId: 'palette', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Lightness" icon={<Icon.palette size={14} />}><Range min={-0.5} max={0.5} step={0.01} value={lightness} onChange={setLightness} /></Row> },
+            { id: 'ctr', label: 'Contrast', sectionId: 'palette', order: 4, type: 'slider', colSpan: 2, render: () => <Row label="Contrast" icon={<Icon.palette size={14} />}><Range min={-1} max={1} step={0.02} value={contrast} onChange={setContrast} /></Row> },
             { id: 'altdh', label: 'Alt hue Δ (odd layers)', sectionId: 'palette', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Alt hue Δ (odd layers)" icon={<Icon.layers size={14} />}><Range min={-90} max={90} step={1} value={altHueDelta} onChange={setAltHueDelta} /></Row> },
             { id: 'altds', label: 'Alt sat × (odd layers)', sectionId: 'palette', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Alt sat × (odd layers)" icon={<Icon.layers size={14} />}><Range min={0.5} max={1.5} step={0.01} value={altSatScale} onChange={setAltSatScale} /></Row> },
             { id: 'seed', label: 'Seed', sectionId: 'variation', order: 98, type: 'button', render: () => <Row label="Seed" right={<button style={btn} onClick={shuffle}>shuffle</button>}><input type="number" value={seed} onChange={e => setSeed(clamp(+e.target.value || 0, 0, 2 ** 31 - 1))} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }} /></Row> },
 
             // Background controls
-            { id: 'bg-toggle', label: 'Glow enabled', sectionId: 'background', order: 1, type: 'toggle', render: () => <Row label="Glow enabled" right={<Toggle checked={backgroundGlowEnabled} onChange={setBackgroundGlowEnabled} />} /> },
-            { id: 'bg-intensity', label: 'Glow intensity', sectionId: 'background', order: 2, type: 'slider', fullRow: true, render: () => <Row label="Glow intensity"><Range min={0} max={2} step={0.01} value={bgGlowIntensity} onChange={setBgGlowIntensity} /></Row> },
-            { id: 'bg-hue', label: 'Glow hue shift', sectionId: 'background', order: 3, type: 'slider', fullRow: true, render: () => <Row label="Glow hue shift"><Range min={-180} max={180} step={1} value={bgGlowHueShift} onChange={setBgGlowHueShift} /></Row> },
+            { id: 'bg-solid-toggle', label: 'Solid background', sectionId: 'background', order: 0, type: 'toggle', render: () => <Row label="Solid background" right={<Toggle checked={solidBgEnabled} onChange={setSolidBgEnabled} />} /> },
+            { id: 'bg-solid-h', label: 'Bg hue', sectionId: 'background', order: 1, type: 'slider', colSpan: 2, render: () => <Row label="Bg hue"><Range min={0} max={360} step={1} value={solidBgHue} onChange={setSolidBgHue} /></Row> },
+            { id: 'bg-solid-s', label: 'Bg saturation', sectionId: 'background', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Bg saturation"><Range min={0} max={1} step={0.01} value={solidBgSat} onChange={setSolidBgSat} /></Row> },
+            { id: 'bg-solid-l', label: 'Bg lightness', sectionId: 'background', order: 3, type: 'slider', render: () => <Row label="Bg lightness"><Range min={0} max={1} step={0.01} value={solidBgLight} onChange={setSolidBgLight} /></Row> },
+            { id: 'bg-toggle', label: 'Glow enabled', sectionId: 'background', order: 4, type: 'toggle', render: () => <Row label="Glow enabled" right={<Toggle checked={backgroundGlowEnabled} onChange={setBackgroundGlowEnabled} />} /> },
+            { id: 'bg-intensity', label: 'Glow intensity', sectionId: 'background', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Glow intensity"><Range min={0} max={2} step={0.01} value={bgGlowIntensity} onChange={setBgGlowIntensity} /></Row> },
+            { id: 'bg-hue', label: 'Glow hue shift', sectionId: 'background', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Glow hue shift"><Range min={-180} max={180} step={1} value={bgGlowHueShift} onChange={setBgGlowHueShift} /></Row> },
           ];
           return <SettingsPanel sections={sections} controls={controls} />;
         })()}
