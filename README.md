@@ -1,4 +1,5 @@
 # CloudEngine (package) + Demo App
+(https://github.com/jakekinchen/cloud-engine)
 
 This repo contains a Next.js demo and a publishable package `cloud-engine` that provides:
 - React component: `CloudMaker`
