@@ -1,7 +1,12 @@
 "use client";
 
 import React from 'react';
-import CloudBackdropReview from './CloudBackdropReview';
+import dynamic from 'next/dynamic';
+
+const CloudBackdropReview = dynamic(() => import('./CloudBackdropReview'), {
+  ssr: false,
+  loading: () => <div style={{ width: 'min(100%, 1200px)', margin: '0 auto', height: 380 }} />,
+});
 
 type Props = {
   className?: string;

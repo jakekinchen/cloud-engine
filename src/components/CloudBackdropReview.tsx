@@ -6,7 +6,7 @@ import Icon from './icons';
 import SettingsPanel from './settings/SettingsPanel';
 import type { SectionSchema, ControlSchema } from './settings/types';
 import { getThemePalette, interpolateThemePalettes, paletteNames } from '@/utils/palettes';
-import { loadCloudDefaults, fetchCloudDefaults, persistCloudDefaults } from '@/config/cloudDefaults';
+import { defaultCloudDefaults, loadCloudDefaults, fetchCloudDefaults, persistCloudDefaults } from '@/config/cloudDefaults';
 
 type Num = number;
 const clamp = (n: Num, a: Num, b: Num) => (n < a ? a : n > b ? b : n);
@@ -155,7 +155,8 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
 
 const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({ className, initial }) => {
   const [hostRef, widthPx] = useElementWidth<HTMLDivElement>();
-  const defaults = useMemo(() => loadCloudDefaults(), []);
+  // Use static defaults for initial render to avoid SSR/CSR mismatch
+  const defaults = defaultCloudDefaults;
   const width = Math.max(600, Math.round(widthPx || (initial?.width ?? defaults.width ?? 1200)));
 
   const [height, setHeight] = useState(initial?.height ?? defaults.height ?? 500);
@@ -474,7 +475,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                   ))}
                 </div>
                 {theme?.colors && (
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, theme.colors.length)})`, gap: 4 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, theme.colors.length)}, 1fr)`, gap: 4 }}>
                     {theme.colors.map((c, idx) => (
                       <button
                         key={idx}
