@@ -31,3 +31,4 @@ jobs:
           npm run build
           npm publish --provenance --access public
 
+

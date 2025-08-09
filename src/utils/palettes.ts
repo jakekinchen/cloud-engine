@@ -78,27 +78,6 @@ export const curatedPalettes: Record<string, PaletteSpec> = {
     },
     tags: ['cool','aurora']
   },
-  glacier: {
-    name: 'glacier',
-    colors: ['#ECF8FF','#D6EFFF','#BCE3FF','#A4D5FF','#8DC3FF','#7BAEFA','#6A96E9'],
-    opacities: [1,0.92,0.84,0.76,0.69,0.62,0.56],
-    background: {
-      angle: 180,
-      stops: [
-        { color: '#071122', pos: 0 },
-        { color: '#0A1730', pos: 59 },
-        { color: '#0D203E', pos: 100 }
-      ],
-      overlay: {
-        angle: 0,
-        stops: [
-          { color: '#9ED0FF22', pos: 0 },
-          { color: '#00000000', pos: 64 }
-        ]
-      }
-    },
-    tags: ['cool','glacier']
-  },
   rose: {
     name: 'rose',
     colors: ['#FFF0F6','#FFD6E6','#FFBDD4','#FFA6C3','#FF90B4','#FF7BA7','#F26C98'],

@@ -195,6 +195,11 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [solidBgHue, setSolidBgHue] = useState(222);
   const [solidBgSat, setSolidBgSat] = useState(0.65);
   const [solidBgLight, setSolidBgLight] = useState(0.14);
+  // Topology controls
+  const [topologyAmplitude, setTopologyAmplitude] = useState(16);
+  const [topologyFrequency, setTopologyFrequency] = useState(0.03);
+  const [topologyFreqStep, setTopologyFreqStep] = useState(0.004);
+  const [topologySecondary, setTopologySecondary] = useState(0.45);
   const [sunsetMode, setSunsetMode] = useState(initial?.sunsetMode ?? defaults.sunsetMode ?? false);
   const [sunsetPeriodSec, setSunsetPeriodSec] = useState(initial?.sunsetPeriodSec ?? defaults.sunsetPeriodSec ?? 12);
   const [autoCyclePalettes, setAutoCyclePalettes] = useState(false);
@@ -206,7 +211,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [contrast, setContrast] = useState(defaults.contrast ?? 0);
   const [altHueDelta, setAltHueDelta] = useState(defaults.altHueDelta ?? -30);
   const [altSatScale, setAltSatScale] = useState(defaults.altSatScale ?? 1.40);
-  const [cloudsEnabled, setCloudsEnabled] = useState(true);
+   const [cloudsEnabled] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
   // Background glow controls
@@ -214,9 +219,9 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [bgGlowIntensity, setBgGlowIntensity] = useState(1);
   const [bgGlowHueShift, setBgGlowHueShift] = useState(0);
 
-  useEffect(() => {
-    setMounted(true);
-    (async () => {
+   useEffect(() => {
+     setMounted(true);
+     void (async () => {
       const d = await fetchCloudDefaults();
       setHeight(initial?.height ?? d.height);
       setLayers(initial?.layers ?? d.layers);
@@ -253,7 +258,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       setContrast(d.contrast);
       setAltHueDelta(d.altHueDelta);
       setAltSatScale(d.altSatScale);
-    })();
+     })();
   }, [initial]);
 
   const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
@@ -454,6 +459,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
         {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
         speed={paused ? 0 : speed}
+        paused={paused}
         seed={seed}
         blur={blur}
         waveForm={waveForm}
@@ -476,6 +482,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         peakRoundnessPower={peakRoundnessPower}
         seamlessLoop={seamlessLoop}
         background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
+        baseAmplitude={topologyAmplitude}
+        baseFrequency={topologyFrequency}
+        layerFrequencyStep={topologyFreqStep}
+        secondaryWaveFactor={topologySecondary}
       />
         ) : (<div style={{ width: '100%', height }} />);
       })()}
@@ -502,8 +512,20 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'actions-top', label: 'Actions', sectionId: 'key', order: 0, type: 'buttons', fullRow: true, render: () => (
               <Row label="Actions">
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    style={{
+                      ...btn,
+                      background: autoCyclePalettes ? 'rgba(255,255,255,.16)' : 'rgba(255,255,255,.06)',
+                      border: autoCyclePalettes ? '1px solid rgba(255,255,255,.4)' : btn.border,
+                    }}
+                    onClick={() => {
+                      setAutoCyclePalettes(v => !v);
+                      if (!sunsetMode) setSunsetMode(true);
+                    }}
+                  >cycle</button>
+                  {/* clouds on/off UI removed per request */}
                   <button style={btn} onClick={() => setPaused(p => !p)}>{paused ? 'resume' : 'pause'}</button>
-                  <button style={btn} onClick={() => {
+                   <button style={btn} onClick={() => {
                     // Randomize UI-focused values only; keep height, speed, blur, structure knobs unchanged
                     setSeed(Math.floor(Math.random() * 1e9));
                     setBaseColor(`#${Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6,'0')}`);
@@ -526,6 +548,11 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     // Morph (optional UI feel)
                     setMorphStrength(Math.round(Math.random() * 100) / 100);
                     setMorphPeriodSec(6 + Math.floor(Math.random() * 30));
+                     // Topology (wave form) parameters
+                     setTopologyAmplitude(Math.round((8 + Math.random() * 28) * 10) / 10); // 8..36
+                     setTopologyFrequency(Math.round((0.01 + Math.random() * 0.07) * 1000) / 1000); // 0.01..0.08
+                     setTopologyFreqStep(Math.round((0.001 + Math.random() * 0.009) * 10000) / 10000); // 0.001..0.01
+                     setTopologySecondary(Math.round((Math.random()) * 100) / 100); // 0..1
                   }}>randomize</button>
                   <button style={btn} onClick={() => {
                     setLayers(7); setSegments(450); setHeight(380);
@@ -546,11 +573,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                 </div>
               </Row>
             ) },
-            { id: 'static', label: 'Static peaks', sectionId: 'key', order: 1, type: 'toggle', render: () => <Row label="Static peaks" icon={<Icon.toggle size={16} />} right={<Toggle checked={staticPeaks} onChange={setStaticPeaks} />} /> },
-            { id: 'clouds', label: 'Clouds on/off', sectionId: 'key', order: 2, type: 'toggle', render: () => <Row label="Clouds on/off" icon={<Icon.wave size={16} />} right={<Toggle checked={cloudsEnabled} onChange={setCloudsEnabled} />} /> },
-            { id: 'seamless', label: 'Seamless morph loop', sectionId: 'key', order: 3, type: 'toggle', render: () => <Row label="Seamless morph loop" icon={<Icon.toggle size={16} />} right={<Toggle checked={seamlessLoop} onChange={setSeamlessLoop} />} /> },
-            { id: 'amp-env', label: 'Amp envelope', sectionId: 'key', order: 3, type: 'slider', fullRow: true, render: () => <Row label="Amp envelope"><Range min={0} max={1} step={0.02} value={amplitudeEnvelopeStrength} onChange={setAmplitudeEnvelopeStrength} /></Row> },
-            { id: 'env-cycles', label: 'Envelope cycles', sectionId: 'key', order: 4, type: 'slider', fullRow: true, render: () => <Row label="Envelope cycles"><Range min={1} max={10} step={1} value={amplitudeEnvelopeCycles} onChange={setAmplitudeEnvelopeCycles} /></Row> },
+            { id: 'static', label: 'Static peaks', sectionId: 'palette', order: 20, type: 'toggle', render: () => <Row label="Static peaks" icon={<Icon.toggle size={16} />} right={<Toggle checked={staticPeaks} onChange={setStaticPeaks} />} /> },
+            { id: 'seamless', label: 'Seamless morph loop', sectionId: 'palette', order: 21, type: 'toggle', render: () => <Row label="Seamless morph loop" icon={<Icon.toggle size={16} />} right={<Toggle checked={seamlessLoop} onChange={setSeamlessLoop} />} /> },
+            { id: 'amp-env', label: 'Amp envelope', sectionId: 'palette', order: 22, type: 'slider', fullRow: true, render: () => <Row label="Amp envelope"><Range min={0} max={1} step={0.02} value={amplitudeEnvelopeStrength} onChange={setAmplitudeEnvelopeStrength} /></Row> },
+            { id: 'env-cycles', label: 'Envelope cycles', sectionId: 'palette', order: 23, type: 'slider', fullRow: true, render: () => <Row label="Envelope cycles"><Range min={1} max={10} step={1} value={amplitudeEnvelopeCycles} onChange={setAmplitudeEnvelopeCycles} /></Row> },
             // removed peak roundness and roundness power per UX request
 
             { id: 'base-color', label: 'Base color', sectionId: 'appearance', order: 1, type: 'color', render: () => <Row label="Base color" right={<input type="color" value={baseColor} onChange={e => setBaseColor(e.target.value)} style={{ width: 36, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }} />} /> },
@@ -575,10 +601,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             // removed Morph controls per UX request
             { id: 'sunset', label: 'Sunset mode', sectionId: 'variation', order: 3, type: 'toggle', render: () => <Row label="Sunset mode" right={<Toggle checked={sunsetMode} onChange={setSunsetMode} />} /> },
             { id: 'sunsets', label: 'Sunset speed (s)', sectionId: 'variation', order: 4, type: 'slider', render: () => <Row label="Sunset speed (s)"><Range min={4} max={60} step={1} value={sunsetPeriodSec} onChange={setSunsetPeriodSec} /></Row> },
-            { id: 'palette-names', label: 'Palette', sectionId: 'variation', order: 5, type: 'palette', fullRow: true, render: () => (
+            { id: 'palette-names', label: 'Palette', sectionId: 'key', order: 5, type: 'palette', fullRow: true, render: () => (
               <div style={{ display: 'grid', gap: 8 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                  {paletteNames.slice(0,8).map((name, i) => (
+                    {paletteNames.filter(n => n !== 'glacier').slice(0,8).map((name, i) => (
                     <button
                       key={name}
                       style={{ ...btn, opacity: paletteIndex === i ? 1 : 0.7 }}
@@ -602,11 +628,16 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                 )}
               </div>
             ) },
-            { id: 'cycle', label: 'Auto-cycle palettes', sectionId: 'variation', order: 6, type: 'toggle', render: () => <Row label="Auto-cycle palettes" right={<Toggle checked={autoCyclePalettes} onChange={setAutoCyclePalettes} />} /> },
+            
             { id: 'hue', label: 'Hue shift', sectionId: 'palette', order: 1, type: 'slider', colSpan: 2, render: () => <Row label="Hue shift" icon={<Icon.palette size={14} />}><Range min={-180} max={180} step={1} value={hueShift} onChange={setHueShift} /></Row> },
             { id: 'sat', label: 'Saturation', sectionId: 'palette', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Saturation" icon={<Icon.palette size={14} />}><Range min={0} max={2} step={0.02} value={saturation} onChange={setSaturation} /></Row> },
             { id: 'light', label: 'Lightness', sectionId: 'palette', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Lightness" icon={<Icon.palette size={14} />}><Range min={-0.5} max={0.5} step={0.01} value={lightness} onChange={setLightness} /></Row> },
             { id: 'ctr', label: 'Contrast', sectionId: 'palette', order: 4, type: 'slider', colSpan: 2, render: () => <Row label="Contrast" icon={<Icon.palette size={14} />}><Range min={-1} max={1} step={0.02} value={contrast} onChange={setContrast} /></Row> },
+            // Topology-impacting sliders
+            { id: 'topo-amp', label: 'Wave amplitude', sectionId: 'key', order: 7, type: 'slider', colSpan: 2, render: () => <Row label="Wave amplitude"><Range min={6} max={36} step={0.5} value={topologyAmplitude} onChange={(v) => setTopologyAmplitude(v)} /></Row> },
+            { id: 'topo-freq', label: 'Base frequency', sectionId: 'key', order: 8, type: 'slider', colSpan: 2, render: () => <Row label="Base frequency"><Range min={0.01} max={0.08} step={0.001} value={topologyFrequency} onChange={(v) => setTopologyFrequency(v)} /></Row> },
+            { id: 'topo-step', label: 'Layer frequency step', sectionId: 'key', order: 9, type: 'slider', colSpan: 2, render: () => <Row label="Layer frequency step"><Range min={0.001} max={0.01} step={0.0005} value={topologyFreqStep} onChange={(v) => setTopologyFreqStep(v)} /></Row> },
+            { id: 'topo-harm', label: 'Secondary wave factor', sectionId: 'key', order: 10, type: 'slider', colSpan: 2, render: () => <Row label="Secondary wave factor"><Range min={0} max={1} step={0.01} value={topologySecondary} onChange={(v) => setTopologySecondary(v)} /></Row> },
             { id: 'altdh', label: 'Alt hue Δ (odd layers)', sectionId: 'palette', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Alt hue Δ (odd layers)" icon={<Icon.layers size={14} />}><Range min={-90} max={90} step={1} value={altHueDelta} onChange={setAltHueDelta} /></Row> },
             { id: 'altds', label: 'Alt sat × (odd layers)', sectionId: 'palette', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Alt sat × (odd layers)" icon={<Icon.layers size={14} />}><Range min={0.5} max={1.5} step={0.01} value={altSatScale} onChange={setAltSatScale} /></Row> },
             { id: 'seed', label: 'Seed', sectionId: 'variation', order: 98, type: 'button', render: () => <Row label="Seed" right={<button style={btn} onClick={shuffle}>shuffle</button>}><input type="number" value={seed} onChange={e => setSeed(clamp(+e.target.value || 0, 0, 2 ** 31 - 1))} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }} /></Row> },
@@ -615,7 +646,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'bg-solid-toggle', label: 'Solid background', sectionId: 'background', order: 0, type: 'toggle', render: () => <Row label="Solid background" right={<Toggle checked={solidBgEnabled} onChange={setSolidBgEnabled} />} /> },
             { id: 'bg-solid-h', label: 'Bg hue', sectionId: 'background', order: 1, type: 'slider', colSpan: 2, render: () => <Row label="Bg hue"><Range min={0} max={360} step={1} value={solidBgHue} onChange={setSolidBgHue} /></Row> },
             { id: 'bg-solid-s', label: 'Bg saturation', sectionId: 'background', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Bg saturation"><Range min={0} max={1} step={0.01} value={solidBgSat} onChange={setSolidBgSat} /></Row> },
-            { id: 'bg-solid-l', label: 'Bg lightness', sectionId: 'background', order: 3, type: 'slider', render: () => <Row label="Bg lightness"><Range min={0} max={1} step={0.01} value={solidBgLight} onChange={setSolidBgLight} /></Row> },
+            { id: 'bg-solid-l', label: 'Bg lightness', sectionId: 'background', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Bg lightness"><Range min={0} max={1} step={0.01} value={solidBgLight} onChange={setSolidBgLight} /></Row> },
             { id: 'bg-toggle', label: 'Glow enabled', sectionId: 'background', order: 4, type: 'toggle', render: () => <Row label="Glow enabled" right={<Toggle checked={backgroundGlowEnabled} onChange={setBackgroundGlowEnabled} />} /> },
             { id: 'bg-intensity', label: 'Glow intensity', sectionId: 'background', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Glow intensity"><Range min={0} max={2} step={0.01} value={bgGlowIntensity} onChange={setBgGlowIntensity} /></Row> },
             { id: 'bg-hue', label: 'Glow hue shift', sectionId: 'background', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Glow hue shift"><Range min={-180} max={180} step={1} value={bgGlowHueShift} onChange={setBgGlowHueShift} /></Row> },

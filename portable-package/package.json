@@ -1,6 +1,6 @@
 {
   "name": "cloud-engine",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "CloudEngine: layered cloud SVG engine with React component CloudMaker.",
   "license": "MIT",
   "type": "module",

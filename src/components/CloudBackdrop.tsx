@@ -26,6 +26,10 @@ type Props = {
   peakNoisePower?: number;         // >=1
   peakHarmonicDamping?: number;    // 0..1
   useSharedBaseline?: boolean;     // prevent checkerboard by aligning fills to common base
+  baseAmplitude?: number;
+  baseFrequency?: number;
+  layerFrequencyStep?: number;
+  secondaryWaveFactor?: number;
   morphStrength?: number;          // 0..1
   morphPeriodSec?: number;         // seconds
   amplitudeEnvelopeStrength?: number; // 0..1
@@ -34,6 +38,7 @@ type Props = {
   peakRoundnessPower?: number;        // >=1
   seamlessLoop?: boolean;
   background?: false | string;        // solid background inside SVG
+  paused?: boolean;                   // freeze animation time when true
   className?: string;
 };
 
@@ -60,6 +65,10 @@ const CloudBackdrop: React.FC<Props> = ({
   peakNoisePower = 2,
   peakHarmonicDamping = 0,
   useSharedBaseline = false,
+  baseAmplitude,
+  baseFrequency,
+  layerFrequencyStep,
+  secondaryWaveFactor,
   morphStrength = 0,
   morphPeriodSec = 12,
   amplitudeEnvelopeStrength = 0.3,
@@ -68,6 +77,7 @@ const CloudBackdrop: React.FC<Props> = ({
   peakRoundnessPower = 2,
   seamlessLoop = true,
   background = '#0b1530',
+  paused = false,
   className
 }) => {
   const engine = useMemo(
@@ -91,6 +101,10 @@ const CloudBackdrop: React.FC<Props> = ({
         peakNoisePower,
         peakHarmonicDamping,
         useSharedBaseline,
+        ...(baseAmplitude !== undefined ? { baseAmplitude } : {}),
+        ...(baseFrequency !== undefined ? { baseFrequency } : {}),
+        ...(layerFrequencyStep !== undefined ? { layerFrequencyStep } : {}),
+        ...(secondaryWaveFactor !== undefined ? { secondaryWaveFactor } : {}),
         morphStrength,
         morphPeriodSec,
         amplitudeEnvelopeStrength,
@@ -117,6 +131,10 @@ const CloudBackdrop: React.FC<Props> = ({
       peakNoisePower,
       peakHarmonicDamping,
       useSharedBaseline,
+      baseAmplitude,
+      baseFrequency,
+      layerFrequencyStep,
+      secondaryWaveFactor,
       morphStrength,
       morphPeriodSec,
       amplitudeEnvelopeStrength,
@@ -128,13 +146,15 @@ const CloudBackdrop: React.FC<Props> = ({
 
   const initial = useMemo(() => engine.pathsAt(0, 0, 0), [engine]);
   const refs = useRef<SVGPathElement[]>([]);
+  const baseElapsedSecRef = useRef(0);
+  const startTimeRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let raf = 0;
-    const t0 = performance.now();
+    startTimeRef.current = performance.now();
     const loop = (t: number) => {
-      const elapsedSec = (t - t0) / 1000;
+      const elapsedSec = baseElapsedSecRef.current + (t - startTimeRef.current) / 1000;
       const phase = speed * elapsedSec; // outward motion
       const period = Math.max(0.0001, engine.config.morphPeriodSec);
       const morphT = (elapsedSec / period) % 1;
@@ -142,9 +162,30 @@ const CloudBackdrop: React.FC<Props> = ({
       engine.pathsAt(phase, morphT, cycleIndex).forEach((p, i) => refs.current[i]?.setAttribute('d', p.d));
       raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [engine, speed, seamlessLoop]);
+    if (!paused) {
+      raf = requestAnimationFrame(loop);
+    } else {
+      // render one frame at frozen time
+      const elapsedSec = baseElapsedSecRef.current;
+      const phase = speed * elapsedSec;
+      const period = Math.max(0.0001, engine.config.morphPeriodSec);
+      const morphT = (elapsedSec / period) % 1;
+      const cycleIndex = seamlessLoop ? 0 : Math.floor(elapsedSec / period);
+      engine.pathsAt(phase, morphT, cycleIndex).forEach((p, i) => refs.current[i]?.setAttribute('d', p.d));
+    }
+    return () => { cancelAnimationFrame(raf); };
+  }, [engine, speed, seamlessLoop, paused]);
+
+  // Accrue elapsed time when effect re-runs (e.g., toggling pause)
+  useEffect(() => {
+    return () => {
+      if (typeof window === 'undefined') return;
+      if (!paused) {
+        const now = performance.now();
+        baseElapsedSecRef.current += (now - startTimeRef.current) / 1000;
+      }
+    };
+  }, [paused]);
 
   return (
     <svg
