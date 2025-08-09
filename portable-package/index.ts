@@ -2,6 +2,7 @@ export { default as CloudMaker } from './CloudBackdrop';
 export type { CloudMakerProps } from './CloudBackdrop';
 
 export { createCloudEngine } from './cloud_maker';
+export { default as cloudDefaults } from './cloudDefaults.json';
 
 export type CloudConfig = Partial<{
   width: number;

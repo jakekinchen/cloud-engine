@@ -25,11 +25,21 @@ function statFile(p) {
 }
 
 function main() {
-  // We sync only the engine for now to preserve the portable component’s extra features
+  // Sync engine and shared defaults from /src into the portable package.
+  // We avoid overwriting the portable component itself to preserve its tailored API.
   const mappings = [
     {
       src: path.join(repoRoot, 'src/utils/cloud_maker.js'),
       dst: path.join(portableDir, 'cloud_maker.js'),
+    },
+    {
+      src: path.join(repoRoot, 'src/config/cloudDefaults.json'),
+      dst: path.join(portableDir, 'cloudDefaults.json'),
+    },
+    {
+      // Copy the repo README into the portable package so npm page stays current
+      src: path.join(repoRoot, 'README.md'),
+      dst: path.join(portableDir, 'README.md'),
     },
   ];
 

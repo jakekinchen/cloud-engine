@@ -6,7 +6,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jakekinchen/cloud-test.git",
+    "url": "git+https://github.com/jakekinchen/cloud-test.git",
     "directory": "portable-package"
   },
   "homepage": "https://github.com/jakekinchen/cloud-test#readme",
@@ -30,12 +30,12 @@
     "node": ">=18"
   },
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
   },
@@ -43,7 +43,8 @@
   "files": [
     "dist",
     "README.md",
-    "assets"
+    "assets",
+    "cloudDefaults.json"
   ],
   "peerDependencies": {
     "react": ">=18"
