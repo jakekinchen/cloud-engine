@@ -196,10 +196,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [solidBgSat, setSolidBgSat] = useState(0.65);
   const [solidBgLight, setSolidBgLight] = useState(0.14);
   // Topology controls
-  const [topologyAmplitude, setTopologyAmplitude] = useState(16);
-  const [topologyFrequency, setTopologyFrequency] = useState(0.03);
-  const [topologyFreqStep, setTopologyFreqStep] = useState(0.004);
-  const [topologySecondary, setTopologySecondary] = useState(0.45);
+  const [topologyAmplitude, setTopologyAmplitude] = useState(6);
+  const [topologyFrequency, setTopologyFrequency] = useState(0.036);
+  const [topologyFreqStep, setTopologyFreqStep] = useState(0.001);
+  const [topologySecondary, setTopologySecondary] = useState(0.0);
   const [sunsetMode, setSunsetMode] = useState(initial?.sunsetMode ?? defaults.sunsetMode ?? false);
   const [sunsetPeriodSec, setSunsetPeriodSec] = useState(initial?.sunsetPeriodSec ?? defaults.sunsetPeriodSec ?? 12);
   const [autoCyclePalettes, setAutoCyclePalettes] = useState(false);
