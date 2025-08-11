@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import CloudBackdrop from './CloudBackdrop';
+import { CloudMaker } from 'cloud-engine';
 import Icon from './icons';
 import SettingsPanel from './settings/SettingsPanel';
 import type { SectionSchema, ControlSchema } from './settings/types';
@@ -191,6 +192,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [peakRoundness, setPeakRoundness] = useState(initial?.peakRoundness ?? defaults.peakRoundness ?? 0.8);
   const [peakRoundnessPower, setPeakRoundnessPower] = useState(initial?.peakRoundnessPower ?? defaults.peakRoundnessPower ?? 10);
   const [seamlessLoop, setSeamlessLoop] = useState(true);
+  const [usePackageEngine, setUsePackageEngine] = useState(false);
   const [solidBgEnabled, setSolidBgEnabled] = useState(true);
   const [solidBgHue, setSolidBgHue] = useState(222);
   const [solidBgSat, setSolidBgSat] = useState(0.65);
@@ -449,44 +451,81 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         const effectivePeakHarmonicDamping = staticPeaks ? 1 : peakHarmonicDamping;
 
         return cloudsEnabled && mounted ? (
-      <CloudBackdrop
-        key={`${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
-        width={width}
-        height={height}
-        layers={layers}
-        segments={segments}
-        baseColor={effectiveBaseColor}
-        {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
-        {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
-        speed={paused ? 0 : speed}
-        paused={paused}
-        seed={seed}
-        blur={blur}
-        waveForm={waveForm}
-        noiseSmoothness={effectiveNoiseSmoothness}
-        amplitudeJitter={effectiveAmplitudeJitter}
-        amplitudeJitterScale={amplitudeJitterScale}
-        additiveBlending={additiveBlending}
-        curveType={effectiveCurveType}
-        curveTension={effectiveCurveTension}
-        peakStability={effectivePeakStability}
-        peakNoiseDamping={effectivePeakNoiseDamping}
-        peakNoisePower={effectivePeakNoisePower}
-        peakHarmonicDamping={effectivePeakHarmonicDamping}
-        useSharedBaseline={useSharedBaseline}
-        morphStrength={morphStrength}
-        morphPeriodSec={morphPeriodSec}
-        amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
-        amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
-        peakRoundness={peakRoundness}
-        peakRoundnessPower={peakRoundnessPower}
-        seamlessLoop={seamlessLoop}
-        background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
-        baseAmplitude={topologyAmplitude}
-        baseFrequency={topologyFrequency}
-        layerFrequencyStep={topologyFreqStep}
-        secondaryWaveFactor={topologySecondary}
-      />
+          usePackageEngine ? (
+            <CloudMaker
+              key={`pkg-${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
+              width={width}
+              height={height}
+              layers={layers}
+              segments={segments}
+              baseColor={effectiveBaseColor}
+              {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
+              {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
+              speed={speed}
+              animate={!paused}
+              seed={seed}
+              blur={blur}
+              waveForm={waveForm}
+              noiseSmoothness={effectiveNoiseSmoothness}
+              amplitudeJitter={effectiveAmplitudeJitter}
+              amplitudeJitterScale={amplitudeJitterScale}
+              additiveBlending={additiveBlending}
+              curveType={effectiveCurveType}
+              curveTension={effectiveCurveTension}
+              peakStability={effectivePeakStability}
+              peakNoiseDamping={effectivePeakNoiseDamping}
+              peakNoisePower={effectivePeakNoisePower}
+              peakHarmonicDamping={effectivePeakHarmonicDamping}
+              useSharedBaseline={useSharedBaseline}
+              morphStrength={morphStrength}
+              morphPeriodSec={morphPeriodSec}
+              amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
+              amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
+              peakRoundness={peakRoundness}
+              peakRoundnessPower={peakRoundnessPower}
+              seamlessLoop={seamlessLoop}
+              background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
+            />
+          ) : (
+            <CloudBackdrop
+              key={`local-${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
+              width={width}
+              height={height}
+              layers={layers}
+              segments={segments}
+              baseColor={effectiveBaseColor}
+              {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
+              {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
+              speed={paused ? 0 : speed}
+              paused={paused}
+              seed={seed}
+              blur={blur}
+              waveForm={waveForm}
+              noiseSmoothness={effectiveNoiseSmoothness}
+              amplitudeJitter={effectiveAmplitudeJitter}
+              amplitudeJitterScale={amplitudeJitterScale}
+              additiveBlending={additiveBlending}
+              curveType={effectiveCurveType}
+              curveTension={effectiveCurveTension}
+              peakStability={effectivePeakStability}
+              peakNoiseDamping={effectivePeakNoiseDamping}
+              peakNoisePower={effectivePeakNoisePower}
+              peakHarmonicDamping={effectivePeakHarmonicDamping}
+              useSharedBaseline={useSharedBaseline}
+              morphStrength={morphStrength}
+              morphPeriodSec={morphPeriodSec}
+              amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
+              amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
+              peakRoundness={peakRoundness}
+              peakRoundnessPower={peakRoundnessPower}
+              seamlessLoop={seamlessLoop}
+              background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
+              baseAmplitude={topologyAmplitude}
+              baseFrequency={topologyFrequency}
+              layerFrequencyStep={topologyFreqStep}
+              secondaryWaveFactor={topologySecondary}
+            />
+          )
         ) : (<div style={{ width: '100%', height }} />);
       })()}
 
@@ -570,6 +609,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     setSunsetMode(false); setPaletteIndex(0);
                   }}>reset</button>
                   <button style={btn} onClick={handleSaveTsx}>save</button>
+                  <button
+                    style={btn}
+                    onClick={() => setUsePackageEngine(v => !v)}
+                  >engine: {usePackageEngine ? 'package' : 'local'}</button>
                 </div>
               </Row>
             ) },
