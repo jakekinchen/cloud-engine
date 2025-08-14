@@ -114,8 +114,12 @@ function rgbToHex(r: number, g: number, b: number) {
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
-// Resample a palette to N entries via linear interpolation in RGB
+// Resample a palette to N entries via linear interpolation in RGB (with caching)
+const resampleCache = new Map<string, string[]>();
 function resampleColors(colors: string[], layers: number): string[] {
+  const key = `${layers}|${colors.join(',')}`;
+  const cached = resampleCache.get(key);
+  if (cached) return cached.slice();
   const source = colors.length > 0 ? colors : ['#ffffff'];
   if (source.length === layers) return source.slice();
   if (layers <= 1) return [source[0] ?? '#ffffff'];
@@ -136,7 +140,8 @@ function resampleColors(colors: string[], layers: number): string[] {
       )
     );
   }
-  return result;
+  resampleCache.set(key, result);
+  return result.slice();
 }
 
 export type GetPaletteOptions = {
@@ -222,6 +227,9 @@ function applyAdjust(hex: string, adj: ThemeAdjust): string {
     const pivot = 0.5;
     hsl.l = Math.max(0, Math.min(1, pivot + (hsl.l - pivot) * (1 + c * 1.5)));
   }
+  // Safety clamps to keep colors within a visually usable range
+  hsl.s = Math.max(0, Math.min(1, hsl.s));
+  hsl.l = Math.max(0.12, Math.min(0.92, hsl.l));
   return hslToHex(hsl);
 }
 

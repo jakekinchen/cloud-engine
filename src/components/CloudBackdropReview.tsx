@@ -159,6 +159,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
 );
 
 const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({ className, initial }) => {
+  const isDev = process.env.NODE_ENV !== 'production';
   const [hostRef, widthPx] = useElementWidth<HTMLDivElement>();
   // Use static defaults for initial render to avoid SSR/CSR mismatch
   const defaults = defaultCloudDefaults;
@@ -220,6 +221,42 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [backgroundGlowEnabled, setBackgroundGlowEnabled] = useState(true);
   const [bgGlowIntensity, setBgGlowIntensity] = useState(1);
   const [bgGlowHueShift, setBgGlowHueShift] = useState(0);
+
+  const resetPaletteAdjustments = React.useCallback(() => {
+    setHueShift(0);
+    setSaturation(1);
+    setLightness(0);
+    setContrast(0);
+    setAltHueDelta(0);
+    setAltSatScale(1);
+  }, []);
+
+  const paletteNameCurrent = useMemo(() => paletteNames[paletteIndex % paletteNames.length] || 'sunset', [paletteIndex]);
+
+  const themeForBackground = useMemo(() => {
+    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
+    if (autoCyclePalettes && smoothTransitionT > 0) {
+      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
+      return interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
+    }
+    return getThemePalette(paletteNameCurrent, layers);
+  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers]);
+
+  const layerTheme = useMemo(() => {
+    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
+    if (autoCyclePalettes && smoothTransitionT > 0) {
+      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
+      return interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
+    }
+    return getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
+      hueShiftDeg: hueShift,
+      saturationScale: saturation,
+      lightnessShift: lightness,
+      contrast,
+      alternateLayerHueDelta: altHueDelta,
+      alternateLayerSaturationScale: altSatScale,
+    });
+  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale]);
 
    useEffect(() => {
      setMounted(true);
@@ -350,22 +387,8 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
 
   const containerStyle: React.CSSProperties = useMemo(() => {
     let bg = 'linear-gradient(180deg, #071122 0%, #0b1530 60%, #0e1838 100%)';
-    if (sunsetMode) {
-      let theme;
-      if (autoCyclePalettes && smoothTransitionT > 0) {
-        const currentPalette = paletteNames[paletteIndex % paletteNames.length] || 'sunset';
-        const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
-        theme = interpolateThemePalettes(currentPalette, nextPalette, smoothTransitionT, layers, { reverse: false }, {
-          hueShiftDeg: hueShift,
-          saturationScale: saturation,
-          lightnessShift: lightness,
-          contrast,
-          alternateLayerHueDelta: altHueDelta,
-          alternateLayerSaturationScale: altSatScale,
-        });
-      } else {
-        theme = getThemePalette(paletteNames[paletteIndex % paletteNames.length] || 'sunset', layers);
-      }
+    if (sunsetMode && themeForBackground) {
+      const theme = themeForBackground;
       if (theme.backgroundCSS) {
         // Compose background base and overlay with optional glow controls
         const spec = theme.spec?.background;
@@ -374,7 +397,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
           const mkOverlay = (intensity: number) => {
             if (!spec.overlay) return undefined;
             const stops = spec.overlay.stops.map(s => {
-              const { r, g, b, a } = parseHex(s.color);
+              const { a } = parseHex(s.color);
               const hsl = hexToHsl(s.color);
               const hh = (hsl.h + bgGlowHueShift + 360) % 360;
               const shiftedHex = hslToHex({ h: hh, s: hsl.s, l: hsl.l });
@@ -406,7 +429,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       overflow: 'hidden',
       background: bg
     };
-  }, [height, sunsetMode, paletteIndex, layers, autoCyclePalettes, smoothTransitionT, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]);
+  }, [height, sunsetMode, themeForBackground, hexToHsl, paletteIndex, layers, autoCyclePalettes, smoothTransitionT, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]);
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr auto 1fr', minHeight: '100vh', width: '100%' }}>
@@ -414,30 +437,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
     <div ref={hostRef} style={containerStyle} className={className}>
       {/* Compute effective parameters if static peaks mode is enabled; also handle color palettes */}
       {(() => {
-        const paletteName = paletteNames[paletteIndex % paletteNames.length] || 'sunset';
-        let p = null;
-        if (sunsetMode) {
-          if (autoCyclePalettes && smoothTransitionT > 0) {
-            const nextPaletteName = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
-            p = interpolateThemePalettes(paletteName, nextPaletteName, smoothTransitionT, layers, { reverse: false }, {
-              hueShiftDeg: hueShift,
-              saturationScale: saturation,
-              lightnessShift: lightness,
-              contrast,
-              alternateLayerHueDelta: altHueDelta,
-              alternateLayerSaturationScale: altSatScale,
-            });
-          } else {
-            p = getThemePalette(paletteName, layers, { reverse: false }, {
-              hueShiftDeg: hueShift,
-              saturationScale: saturation,
-              lightnessShift: lightness,
-              contrast,
-              alternateLayerHueDelta: altHueDelta,
-              alternateLayerSaturationScale: altSatScale,
-            });
-          }
-        }
+        const p = layerTheme;
         const effectiveBaseColor = sunsetMode ? '#ffffff' : baseColor;
         const effectiveLayerColors = sunsetMode ? p?.colors : undefined;
         const effectiveLayerOpacities = sunsetMode ? p?.opacities : undefined;
@@ -537,7 +537,17 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       {controlsVisible && (
       <div style={{ ...panelStyle, height, width: '85vw', maxWidth: '1000px', margin: '0 auto', background: sunsetMode && paletteNames[paletteIndex] ? 'rgba(12,16,28,.6)' : panelStyle.background }}>
         {(() => {
-          const theme = sunsetMode ? getThemePalette(paletteNames[paletteIndex % paletteNames.length] || 'sunset', layers) : null;
+          const paletteNameCurrent = paletteNames[paletteIndex % paletteNames.length] || 'sunset';
+          const adjustmentsNeutral = hueShift === 0 && saturation === 1 && lightness === 0 && contrast === 0 && altHueDelta === 0 && altSatScale === 1;
+          const curatedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers) : null;
+          const adjustedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
+            hueShiftDeg: hueShift,
+            saturationScale: saturation,
+            lightnessShift: lightness,
+            contrast,
+            alternateLayerHueDelta: altHueDelta,
+            alternateLayerSaturationScale: altSatScale,
+          }) : null;
            const sections: SectionSchema[] = [
             { id: 'key', title: 'Key Controls', order: 1 },
             { id: 'appearance', title: 'Appearance', order: 2 },
@@ -558,24 +568,32 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                       border: autoCyclePalettes ? '1px solid rgba(255,255,255,.4)' : btn.border,
                     }}
                     onClick={() => {
-                      setAutoCyclePalettes(v => !v);
-                      if (!sunsetMode) setSunsetMode(true);
+                      setAutoCyclePalettes(v => {
+                        const next = !v;
+                        if (next) {
+                          if (!sunsetMode) setSunsetMode(true);
+                          resetPaletteAdjustments();
+                          setSmoothTransitionT(0);
+                        }
+                        return next;
+                      });
                     }}
                   >cycle</button>
                   {/* clouds on/off UI removed per request */}
                   <button style={btn} onClick={() => setPaused(p => !p)}>{paused ? 'resume' : 'pause'}</button>
-                   <button style={btn} onClick={() => {
+                  <button style={btn} onClick={() => {
                     // Randomize UI-focused values only; keep height, speed, blur, structure knobs unchanged
                     setSeed(Math.floor(Math.random() * 1e9));
                     setBaseColor(`#${Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6,'0')}`);
                     // Palette-related
                     setPaletteIndex(Math.floor(Math.random() * paletteNames.length));
                     setHueShift(Math.floor(Math.random() * 361) - 180);
-                    setSaturation(Math.round((0.5 + Math.random() * 1.5) * 100) / 100);
-                    setLightness(Math.round(((Math.random() - 0.5)) * 100) / 100);
-                    setContrast(Math.round(((Math.random() - 0.5) * 2) * 100) / 100);
-                    setAltHueDelta(Math.floor(Math.random() * 181) - 90);
-                    setAltSatScale(Math.round((0.5 + Math.random()) * 100) / 100);
+                    // Tamed ranges to reduce extreme darkening or over-saturation
+                    setSaturation(Math.round((0.8 + Math.random() * 0.4) * 100) / 100); // 0.8..1.2
+                    setLightness(Math.round(((Math.random() - 0.5) * 0.3) * 100) / 100); // -0.15..0.15
+                    setContrast(Math.round(((Math.random() - 0.5) * 0.8) * 100) / 100); // -0.4..0.4
+                    setAltHueDelta(Math.floor(Math.random() * 91) - 45); // -45..45
+                    setAltSatScale(Math.round((0.85 + Math.random() * 0.3) * 100) / 100); // 0.85..1.15
                     // Sunset options
                     setSunsetMode(Math.random() < 0.5);
                     setSunsetPeriodSec(6 + Math.floor(Math.random() * 30));
@@ -609,11 +627,18 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     setSunsetMode(false); setPaletteIndex(0);
                   }}>reset</button>
                   <button style={btn} onClick={handleSaveTsx}>save</button>
-                  <button
-                    style={btn}
-                    onClick={() => setUsePackageEngine(v => !v)}
-                  >engine: {usePackageEngine ? 'package' : 'local'}</button>
+                  {isDev && (
+                    <button
+                      style={btn}
+                      onClick={() => setUsePackageEngine(v => !v)}
+                    >engine: {usePackageEngine ? 'package' : 'local'}</button>
+                  )}
                 </div>
+              </Row>
+            ) },
+            { id: 'palette-reset', label: 'Reset adjustments', sectionId: 'palette', order: 0, type: 'button', fullRow: true, render: () => (
+              <Row label="Palette adjustments">
+                <button style={btn} onClick={resetPaletteAdjustments}>reset</button>
               </Row>
             ) },
             { id: 'static', label: 'Static peaks', sectionId: 'palette', order: 20, type: 'toggle', render: () => <Row label="Static peaks" icon={<Icon.toggle size={16} />} right={<Toggle checked={staticPeaks} onChange={setStaticPeaks} />} /> },
@@ -642,31 +667,49 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             // removed Shared baseline per UX request
 
             // removed Morph controls per UX request
-            { id: 'sunset', label: 'Sunset mode', sectionId: 'variation', order: 3, type: 'toggle', render: () => <Row label="Sunset mode" right={<Toggle checked={sunsetMode} onChange={setSunsetMode} />} /> },
+            { id: 'sunset', label: 'Sunset mode', sectionId: 'variation', order: 3, type: 'toggle', render: () => <Row label="Sunset mode" right={<Toggle checked={sunsetMode} onChange={(v) => { setSunsetMode(v); if (v) { resetPaletteAdjustments(); setSmoothTransitionT(0); } }} />} /> },
             { id: 'sunsets', label: 'Sunset speed (s)', sectionId: 'variation', order: 4, type: 'slider', render: () => <Row label="Sunset speed (s)"><Range min={4} max={60} step={1} value={sunsetPeriodSec} onChange={setSunsetPeriodSec} /></Row> },
             { id: 'palette-names', label: 'Palette', sectionId: 'key', order: 5, type: 'palette', fullRow: true, render: () => (
               <div style={{ display: 'grid', gap: 8 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                    {paletteNames.filter(n => n !== 'glacier').slice(0,8).map((name, i) => (
+                    {paletteNames.slice(0,8).map((name, i) => (
                     <button
                       key={name}
                       style={{ ...btn, opacity: paletteIndex === i ? 1 : 0.7 }}
-                      onPointerDown={() => { setPaletteIndex(i); setSunsetMode(true); setAutoCyclePalettes(false); }}
+                      onPointerDown={() => { setPaletteIndex(i); setSunsetMode(true); setAutoCyclePalettes(false); resetPaletteAdjustments(); }}
                     >
                       {name}
                     </button>
                   ))}
                 </div>
-                {theme?.colors && (
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, theme.colors.length)}, 1fr)`, gap: 4 }}>
-                    {theme.colors.map((c, idx) => (
-                      <button
-                        key={idx}
-                        title={c}
-                        style={{ height: 18, background: c, borderRadius: 4, border: '1px solid rgba(255,255,255,.35)', cursor: 'pointer' }}
-                        onPointerDown={() => setPaletteIndex(paletteIndex)}
-                      />
-                    ))}
+                {curatedTheme?.colors && (
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ opacity: 0.8, fontSize: 11 }}>curated</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, curatedTheme.colors.length)}, 1fr)`, gap: 4 }}>
+                      {curatedTheme.colors.map((c, idx) => (
+                        <button
+                          key={`cur-${idx}`}
+                          title={c}
+                          style={{ height: 18, background: c, borderRadius: 4, border: '1px solid rgba(255,255,255,.35)', cursor: 'pointer' }}
+                          onPointerDown={() => setPaletteIndex(paletteIndex)}
+                        />
+                      ))}
+                    </div>
+                    {!adjustmentsNeutral && adjustedTheme?.colors && (
+                      <>
+                        <div style={{ opacity: 0.8, fontSize: 11 }}>adjusted</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, adjustedTheme.colors.length)}, 1fr)`, gap: 4 }}>
+                          {adjustedTheme.colors.map((c, idx) => (
+                            <button
+                              key={`adj-${idx}`}
+                              title={c}
+                              style={{ height: 18, background: c, borderRadius: 4, border: '1px solid rgba(255,255,255,.35)', cursor: 'pointer' }}
+                              onPointerDown={() => setPaletteIndex(paletteIndex)}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

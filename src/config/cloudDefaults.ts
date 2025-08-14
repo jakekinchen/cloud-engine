@@ -85,7 +85,7 @@ export function loadCloudDefaults(): CloudDefaults {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultCloudDefaults;
     const parsed = JSON.parse(raw);
-    return { ...defaultCloudDefaults, ...parsed } as CloudDefaults;
+    return normalizeDefaults({ ...defaultCloudDefaults, ...parsed } as CloudDefaults);
   } catch {
     return defaultCloudDefaults;
   }
@@ -109,7 +109,7 @@ export async function fetchCloudDefaults(): Promise<CloudDefaults> {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
-    return { ...defaultCloudDefaults, ...data };
+    return normalizeDefaults({ ...defaultCloudDefaults, ...data });
   } catch {
     return loadCloudDefaults();
   }
@@ -127,10 +127,34 @@ export async function persistCloudDefaults(next: Partial<CloudDefaults>): Promis
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
-    return data;
+    return normalizeDefaults(data);
   } catch {
     return null;
   }
+}
+
+function clamp(n: number, a: number, b: number) {
+  return n < a ? a : n > b ? b : n;
+}
+
+function normalizeDefaults(d: CloudDefaults): CloudDefaults {
+  // Ensure palette-related adjustments are within safe/neutralizable ranges
+  const hueShift = Math.round(clamp(d.hueShift ?? 0, -180, 180));
+  const saturation = Math.round(clamp(d.saturation ?? 1, 0, 2) * 100) / 100;
+  const lightness = Math.round(clamp(d.lightness ?? 0, -0.5, 0.5) * 100) / 100;
+  const contrast = Math.round(clamp(d.contrast ?? 0, -1, 1) * 100) / 100;
+  const altHueDelta = Math.round(clamp(d.altHueDelta ?? 0, -90, 90));
+  const altSatScale = Math.round(clamp(d.altSatScale ?? 1, 0.5, 1.5) * 100) / 100;
+
+  return {
+    ...d,
+    hueShift,
+    saturation,
+    lightness,
+    contrast,
+    altHueDelta,
+    altSatScale,
+  };
 }
 
 
