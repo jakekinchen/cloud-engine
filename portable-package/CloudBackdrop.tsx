@@ -15,7 +15,7 @@ export type CloudMakerProps = {
   speed?: number;
   seed?: number;
   blur?: number;
-  waveForm?: 'sin' | 'cos' | 'sincos';
+  waveForm?: 'sin' | 'cos' | 'sincos' | 'round';
   noiseSmoothness?: number;
   amplitudeJitter?: number;
   amplitudeJitterScale?: number;

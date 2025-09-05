@@ -7,7 +7,7 @@
   "speed": 34,
   "seed": 1337,
   "blur": 0,
-  "waveForm": "sincos",
+  "waveForm": "round",
   "noiseSmoothness": 0.45,
   "amplitudeJitter": 0,
   "amplitudeJitterScale": 0.25,

@@ -81,7 +81,7 @@ const Range: React.FC<{
 export type Init = Partial<{
   width: number; height: number; layers: number; segments: number; baseColor: string;
   speed: number; seed: number; blur: number;
-  waveForm: 'sin' | 'cos' | 'sincos';
+  waveForm: 'sin' | 'cos' | 'sincos' | 'round';
   noiseSmoothness: number;
   amplitudeJitter: number;
   amplitudeJitterScale: number;
@@ -173,7 +173,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [seed, setSeed] = useState(initial?.seed ?? defaults.seed ?? 1337);
   const [blur, setBlur] = useState(initial?.blur ?? defaults.blur ?? 0);
   const [paused, setPaused] = useState(false);
-  const [waveForm, setWaveForm] = useState<"sin" | "cos" | "sincos">(initial?.waveForm ?? defaults.waveForm ?? 'sincos');
+  const [waveForm, setWaveForm] = useState<"sin" | "cos" | "sincos" | "round">(initial?.waveForm ?? defaults.waveForm ?? 'round');
   const [noiseSmoothness, setNoiseSmoothness] = useState(initial?.noiseSmoothness ?? defaults.noiseSmoothness ?? 0.45);
   const [amplitudeJitter, setAmplitudeJitter] = useState(initial?.amplitudeJitter ?? defaults.amplitudeJitter ?? 0);
   const [amplitudeJitterScale, setAmplitudeJitterScale] = useState(initial?.amplitudeJitterScale ?? defaults.amplitudeJitterScale ?? 0.25);
@@ -654,7 +654,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'speed', label: 'Speed', sectionId: 'appearance', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Speed"><Range min={0} max={140} step={1} value={speed} onChange={setSpeed} /></Row> },
             { id: 'blur', label: 'Blur', sectionId: 'appearance', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Blur"><Range min={0} max={6} step={0.2} value={blur} onChange={setBlur} /></Row> },
 
-            { id: 'waveform', label: 'Wave form', sectionId: 'motion', order: 1, type: 'select', render: () => <Row label="Wave form" right={<select value={waveForm} onChange={e => setWaveForm(e.target.value as 'sin' | 'cos' | 'sincos')} style={{ background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,.25)', borderRadius: 8, padding: '6px 8px' }}><option value="sincos">sin + harmonic</option><option value="sin">sin</option><option value="cos">cos</option></select>} /> },
+            { id: 'waveform', label: 'Wave form', sectionId: 'motion', order: 1, type: 'select', render: () => <Row label="Wave form" right={<select value={waveForm} onChange={e => setWaveForm(e.target.value as 'sin' | 'cos' | 'sincos' | 'round')} style={{ background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,.25)', borderRadius: 8, padding: '6px 8px' }}><option value="sincos">sin + harmonic</option><option value="sin">sin</option><option value="cos">cos</option><option value="round">rounded cos</option></select>} /> },
             // removed noise smoothness, amplitude jitter, and jitter scale per UX request
             { id: 'blend', label: 'Additive blending', sectionId: 'motion', order: 5, type: 'toggle', render: () => <Row label="Additive blending" right={<Toggle checked={additiveBlending} onChange={setAdditiveBlending} />} /> },
             // removed Curve type per UX request
