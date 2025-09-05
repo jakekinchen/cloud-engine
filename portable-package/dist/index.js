@@ -51,8 +51,8 @@ function createCloudEngine(opts = {}) {
     blur: 2.2,
     seed: 1337,
     // New physicality controls
-    waveForm: "sincos",
-    // 'sin' | 'cos' | 'sincos'
+    waveForm: "round",
+    // 'sin' | 'cos' | 'sincos' | 'round'
     noiseSmoothness: 0.45,
     // 0..1 moving-average smoothing on noise
     amplitudeJitter: 0,
@@ -198,6 +198,9 @@ function createCloudEngine(opts = {}) {
         wave = Math.sin(baseArg);
       } else if (o.waveForm === "cos") {
         wave = Math.cos(baseArg);
+      } else if (o.waveForm === "round") {
+        const c = Math.cos(baseArg);
+        wave = c / (0.4 + 0.4 * Math.abs(c));
       } else {
         const base = Math.sin(baseArg);
         const harmonic = Math.sin(2 * baseArg + p.phi * 0.3);
@@ -316,7 +319,7 @@ var cloudDefaults_default = {
   speed: 34,
   seed: 1337,
   blur: 0,
-  waveForm: "sincos",
+  waveForm: "round",
   noiseSmoothness: 0.45,
   amplitudeJitter: 0,
   amplitudeJitterScale: 0.25,
@@ -459,7 +462,7 @@ var presets = {
     baseColor: "#ffffff",
     seed: 1337,
     blur: 2.2,
-    waveForm: "sincos",
+    waveForm: "round",
     noiseSmoothness: 0.45,
     amplitudeJitter: 0,
     amplitudeJitterScale: 0.25,

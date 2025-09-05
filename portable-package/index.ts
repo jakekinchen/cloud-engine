@@ -14,7 +14,7 @@ export type CloudConfig = Partial<{
   layerOpacities: number[];
   seed: number;
   blur: number;
-  waveForm: 'sin' | 'cos' | 'sincos';
+  waveForm: 'sin' | 'cos' | 'sincos' | 'round';
   noiseSmoothness: number;
   amplitudeJitter: number;
   amplitudeJitterScale: number;
@@ -48,7 +48,7 @@ export const presets = {
     baseColor: '#ffffff',
     seed: 1337,
     blur: 2.2,
-    waveForm: 'sincos' as const,
+    waveForm: 'round' as const,
     noiseSmoothness: 0.45,
     amplitudeJitter: 0,
     amplitudeJitterScale: 0.25,

@@ -23,7 +23,7 @@ export function createCloudEngine(opts = {}) {
     layerVerticalSpacing: 16, secondaryWaveFactor: 0.45,
     baseColor: '#ffffff', layerColors: [], blur: 2.2, seed: 1337,
     // New physicality controls
-    waveForm: 'sincos',            // 'sin' | 'cos' | 'sincos'
+    waveForm: 'round',             // 'sin' | 'cos' | 'sincos' | 'round'
     noiseSmoothness: 0.45,         // 0..1 moving-average smoothing on noise
     amplitudeJitter: 0,            // 0..1 multiplicative jitter on amplitude
     amplitudeJitterScale: 0.25,    // 0..1 fraction of segments for jitter correlation length
@@ -159,6 +159,9 @@ export function createCloudEngine(opts = {}) {
         wave = Math.sin(baseArg);
       } else if (o.waveForm === 'cos') {
         wave = Math.cos(baseArg);
+      } else if (o.waveForm === 'round') {
+        const c = Math.cos(baseArg);
+        wave = c / (0.4 + 0.4 * Math.abs(c));
       } else {
         const base = Math.sin(baseArg);
         const harmonic = Math.sin(2 * baseArg + p.phi * 0.3);

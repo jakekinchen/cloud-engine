@@ -11,7 +11,7 @@ type CloudMakerProps = {
     speed?: number;
     seed?: number;
     blur?: number;
-    waveForm?: 'sin' | 'cos' | 'sincos';
+    waveForm?: 'sin' | 'cos' | 'sincos' | 'round';
     noiseSmoothness?: number;
     amplitudeJitter?: number;
     amplitudeJitterScale?: number;
@@ -97,7 +97,7 @@ var baseColor = "#ffffff";
 var speed = 34;
 var seed = 1337;
 var blur = 0;
-var waveForm = "sincos";
+var waveForm = "round";
 var noiseSmoothness = 0.45;
 var amplitudeJitter = 0;
 var amplitudeJitterScale = 0.25;
@@ -174,7 +174,7 @@ type CloudConfig = Partial<{
     layerOpacities: number[];
     seed: number;
     blur: number;
-    waveForm: 'sin' | 'cos' | 'sincos';
+    waveForm: 'sin' | 'cos' | 'sincos' | 'round';
     noiseSmoothness: number;
     amplitudeJitter: number;
     amplitudeJitterScale: number;
@@ -206,7 +206,7 @@ declare const presets: {
         baseColor: string;
         seed: number;
         blur: number;
-        waveForm: "sincos";
+        waveForm: "round";
         noiseSmoothness: number;
         amplitudeJitter: number;
         amplitudeJitterScale: number;

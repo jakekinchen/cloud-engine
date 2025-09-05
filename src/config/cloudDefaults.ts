@@ -7,7 +7,7 @@ export type CloudDefaults = {
   speed: number;
   seed: number;
   blur: number;
-  waveForm: 'sin' | 'cos' | 'sincos';
+  waveForm: 'sin' | 'cos' | 'sincos' | 'round';
   noiseSmoothness: number;
   amplitudeJitter: number;
   amplitudeJitterScale: number;
@@ -49,7 +49,7 @@ export const defaultCloudDefaults: CloudDefaults = {
   speed: 60,
   seed: 1337,
   blur: 2.2,
-  waveForm: 'sincos',
+  waveForm: 'round',
   noiseSmoothness: 0.45,
   amplitudeJitter: 0,
   amplitudeJitterScale: 0.25,

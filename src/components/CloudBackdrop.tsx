@@ -14,7 +14,7 @@ type Props = {
   speed?: number;   // outward px/s for the traveling wave
   seed?: number;
   blur?: number;
-  waveForm?: 'sin' | 'cos' | 'sincos';
+  waveForm?: 'sin' | 'cos' | 'sincos' | 'round';
   noiseSmoothness?: number;       // 0..1
   amplitudeJitter?: number;       // 0..1
   amplitudeJitterScale?: number;  // 0..1
@@ -53,7 +53,7 @@ const CloudBackdrop: React.FC<Props> = ({
   speed = 60,
   seed = 1337,
   blur = 2.2,
-  waveForm = 'sincos',
+  waveForm = 'round',
   noiseSmoothness = 0,
   amplitudeJitter = 0,
   amplitudeJitterScale = 0.25,
