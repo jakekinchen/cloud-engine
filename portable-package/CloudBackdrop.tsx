@@ -106,7 +106,7 @@ const CloudMaker: React.FC<CloudMakerProps> = ({
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); };
   }, [engine, speed, animate, seamlessLoop]);
 
   const preserve = fit === 'stretch' ? 'none' : (fit === 'slice' ? 'xMidYMid slice' : 'xMidYMid meet');

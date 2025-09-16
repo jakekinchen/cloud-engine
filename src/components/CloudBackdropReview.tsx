@@ -23,7 +23,7 @@ function useElementWidth<T extends HTMLElement>(): [React.RefObject<T | null>, n
       setW(entry.contentRect.width);
     });
     obs.observe(ref.current);
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); };
   }, []);
   return [ref, w];
 }
@@ -65,13 +65,13 @@ const Range: React.FC<{
   <div style={{ display: 'grid', gridTemplateColumns: numberBox ? '1fr 88px' : '1fr', gap: 10, width: '100%' }}>
     <input
       type="range" min={min} max={max} step={step} value={value}
-      onChange={e => onChange(clamp(+e.target.value, min, max))}
+      onChange={e => { onChange(clamp(+e.target.value, min, max)); }}
       style={{ width: '100%', height: 28, accentColor: '#9cc2ff' }}
     />
     {numberBox && (
       <input
         type="number" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(clamp(+e.target.value, min, max))}
+        onChange={e => { onChange(clamp(+e.target.value, min, max)); }}
         style={{ width: 88, background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }}
       />
     )}
@@ -97,8 +97,6 @@ export type Init = Partial<{
   morphPeriodSec: number;
   amplitudeEnvelopeStrength: number;
   amplitudeEnvelopeCycles: number;
-  peakRoundness: number;
-  peakRoundnessPower: number;
   sunsetMode: boolean;
   sunsetPeriodSec: number;
 }>;
@@ -132,7 +130,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
     <input
       type="checkbox"
       checked={checked}
-      onChange={e => onChange(e.target.checked)}
+      onChange={e => { onChange(e.target.checked); }}
       style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
     />
     <span
@@ -190,8 +188,6 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [morphPeriodSec, setMorphPeriodSec] = useState(initial?.morphPeriodSec ?? defaults.morphPeriodSec ?? 18);
   const [amplitudeEnvelopeStrength, setAmplitudeEnvelopeStrength] = useState(initial?.amplitudeEnvelopeStrength ?? defaults.amplitudeEnvelopeStrength ?? 0.36);
   const [amplitudeEnvelopeCycles, setAmplitudeEnvelopeCycles] = useState(initial?.amplitudeEnvelopeCycles ?? defaults.amplitudeEnvelopeCycles ?? 2);
-  const [peakRoundness, setPeakRoundness] = useState(initial?.peakRoundness ?? defaults.peakRoundness ?? 0.8);
-  const [peakRoundnessPower, setPeakRoundnessPower] = useState(initial?.peakRoundnessPower ?? defaults.peakRoundnessPower ?? 10);
   const [seamlessLoop, setSeamlessLoop] = useState(true);
   const [usePackageEngine, setUsePackageEngine] = useState(false);
   const [solidBgEnabled, setSolidBgEnabled] = useState(true);
@@ -203,6 +199,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [topologyFrequency, setTopologyFrequency] = useState(0.036);
   const [topologyFreqStep, setTopologyFreqStep] = useState(0.001);
   const [topologySecondary, setTopologySecondary] = useState(0.0);
+  // Palette tinting controls
+  const [tintEnabled, setTintEnabled] = useState(true);
+  const [tintStrength, setTintStrength] = useState(0.4);
+  const [layerSpacing, setLayerSpacing] = useState(16);
   const [sunsetMode, setSunsetMode] = useState(initial?.sunsetMode ?? defaults.sunsetMode ?? false);
   const [sunsetPeriodSec, setSunsetPeriodSec] = useState(initial?.sunsetPeriodSec ?? defaults.sunsetPeriodSec ?? 12);
   const [autoCyclePalettes, setAutoCyclePalettes] = useState(false);
@@ -231,120 +231,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
     setAltSatScale(1);
   }, []);
 
-  const paletteNameCurrent = useMemo(() => paletteNames[paletteIndex % paletteNames.length] || 'sunset', [paletteIndex]);
-
-  const themeForBackground = useMemo(() => {
-    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
-    if (autoCyclePalettes && smoothTransitionT > 0) {
-      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
-      return interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
-    }
-    return getThemePalette(paletteNameCurrent, layers);
-  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers]);
-
-  const layerTheme = useMemo(() => {
-    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
-    if (autoCyclePalettes && smoothTransitionT > 0) {
-      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
-      return interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
-    }
-    return getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
-      hueShiftDeg: hueShift,
-      saturationScale: saturation,
-      lightnessShift: lightness,
-      contrast,
-      alternateLayerHueDelta: altHueDelta,
-      alternateLayerSaturationScale: altSatScale,
-    });
-  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale]);
-
-   useEffect(() => {
-     setMounted(true);
-     void (async () => {
-      const d = await fetchCloudDefaults();
-      setHeight(initial?.height ?? d.height);
-      setLayers(initial?.layers ?? d.layers);
-      setSegments(initial?.segments ?? d.segments);
-      setBaseColor(initial?.baseColor ?? d.baseColor);
-      setSpeed(initial?.speed ?? d.speed);
-      setSeed(initial?.seed ?? d.seed);
-      setBlur(initial?.blur ?? d.blur);
-      setWaveForm(initial?.waveForm ?? d.waveForm);
-      setNoiseSmoothness(initial?.noiseSmoothness ?? d.noiseSmoothness);
-      setAmplitudeJitter(initial?.amplitudeJitter ?? d.amplitudeJitter);
-      setAmplitudeJitterScale(initial?.amplitudeJitterScale ?? d.amplitudeJitterScale);
-      setAdditiveBlending(d.additiveBlending);
-      setCurveType(initial?.curveType ?? d.curveType);
-      setCurveTension(initial?.curveTension ?? d.curveTension);
-      setPeakStability(initial?.peakStability ?? d.peakStability);
-      setPeakNoiseDamping(initial?.peakNoiseDamping ?? d.peakNoiseDamping);
-      setPeakNoisePower(initial?.peakNoisePower ?? d.peakNoisePower);
-      setPeakHarmonicDamping(initial?.peakHarmonicDamping ?? d.peakHarmonicDamping);
-      setStaticPeaks(initial?.staticPeaks ?? d.staticPeaks);
-      setUseSharedBaseline(initial?.useSharedBaseline ?? d.useSharedBaseline);
-      setMorphStrength(initial?.morphStrength ?? d.morphStrength);
-      setMorphPeriodSec(initial?.morphPeriodSec ?? d.morphPeriodSec);
-      setAmplitudeEnvelopeStrength(initial?.amplitudeEnvelopeStrength ?? d.amplitudeEnvelopeStrength);
-      setAmplitudeEnvelopeCycles(initial?.amplitudeEnvelopeCycles ?? d.amplitudeEnvelopeCycles);
-      setPeakRoundness(initial?.peakRoundness ?? d.peakRoundness);
-      setPeakRoundnessPower(initial?.peakRoundnessPower ?? d.peakRoundnessPower);
-      setSunsetMode(initial?.sunsetMode ?? d.sunsetMode);
-      setSunsetPeriodSec(initial?.sunsetPeriodSec ?? d.sunsetPeriodSec);
-      setPaletteIndex(d.paletteIndex);
-      setHueShift(d.hueShift);
-      setSaturation(d.saturation);
-      setLightness(d.lightness);
-      setContrast(d.contrast);
-      setAltHueDelta(d.altHueDelta);
-      setAltSatScale(d.altSatScale);
-     })();
-  }, [initial]);
-
-  const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
-
-  const handleSaveTsx = React.useCallback(async () => {
-    const defaultPaletteColors: Record<string, string[]> = {};
-    paletteNames.forEach(paletteName => {
-      const palette = getThemePalette(paletteName, layers);
-      defaultPaletteColors[paletteName] = palette.colors;
-    });
-
-    await persistCloudDefaults({
-      width, height, layers, segments, baseColor, speed, seed, blur, waveForm,
-      noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending,
-      curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower,
-      peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec,
-      amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower,
-      staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation,
-      lightness, contrast, altHueDelta, altSatScale, defaultPaletteColors,
-    });
-  }, [
-    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale
-  ]);
-
-  // Sunset palette auto-cycling with smooth transitions
-  React.useEffect(() => {
-    if (!sunsetMode || !autoCyclePalettes) return;
-    let raf = 0;
-    const t0 = performance.now();
-    const tick = (t: number) => {
-      const elapsed = (t - t0) / 1000;
-      const period = Math.max(1, sunsetPeriodSec);
-      const totalCycle = elapsed / period;
-      const idx = Math.floor(totalCycle) % paletteNames.length;
-      const transitionT = totalCycle - Math.floor(totalCycle);
-      
-      setPaletteIndex(idx);
-      setSmoothTransitionT(transitionT);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [sunsetMode, autoCyclePalettes, sunsetPeriodSec]);
-
-  // Helpers for background CSS composition
-  const mkLinear = (angle: number, stops: { color: string; pos: number }[]) =>
-    `linear-gradient(${angle}deg, ${stops.map(s => `${s.color} ${s.pos}%`).join(', ')})`;
+  // Shared color helpers (used by palette tinting and background composition)
   const parseHex = (hex: string) => {
     let h = hex.replace('#', '');
     if (h.length === 3) h = h.split('').map(c => c + c).join('');
@@ -384,6 +271,213 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
     };
     return `#${c(f(0))}${c(f(8))}${c(f(4))}`;
   };
+
+  const paletteNameCurrent = useMemo(() => paletteNames[paletteIndex % paletteNames.length] || 'sunset', [paletteIndex]);
+
+  const themeForBackground = useMemo(() => {
+    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
+    if (autoCyclePalettes && smoothTransitionT > 0) {
+      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
+      return interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
+    }
+    return getThemePalette(paletteNameCurrent, layers);
+  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers]);
+
+  const layerTheme = useMemo(() => {
+    if (!sunsetMode) return null as ReturnType<typeof getThemePalette> | null;
+    const applyTint = (colors: string[]) => {
+      if (!tintEnabled || tintStrength <= 0) return colors;
+      const t = Math.max(0, Math.min(1, tintStrength));
+      const base = hexToHsl(baseColor);
+      return colors.map(hex => {
+        const a = hexToHsl(hex);
+        const dh = ((base.h - a.h + 540) % 360) - 180;
+        const h = (a.h + dh * t + 360) % 360;
+        const s = a.s + (base.s - a.s) * t;
+        const l = a.l + (base.l - a.l) * t;
+        return hslToHex({ h, s, l });
+      });
+    };
+    if (autoCyclePalettes && smoothTransitionT > 0) {
+      const nextPalette = paletteNames[(paletteIndex + 1) % paletteNames.length] || 'sunset';
+      const th = interpolateThemePalettes(paletteNameCurrent, nextPalette, smoothTransitionT, layers, { reverse: false });
+      return { ...th, colors: applyTint(th.colors) };
+    }
+    const th = getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
+      hueShiftDeg: hueShift,
+      saturationScale: saturation,
+      lightnessShift: lightness,
+      contrast,
+      alternateLayerHueDelta: altHueDelta,
+      alternateLayerSaturationScale: altSatScale,
+    });
+    return { ...th, colors: applyTint(th.colors) };
+  }, [sunsetMode, autoCyclePalettes, smoothTransitionT, paletteIndex, paletteNameCurrent, layers, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, tintEnabled, tintStrength, baseColor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+   useEffect(() => {
+     setMounted(true);
+     void (async () => {
+      const d = await fetchCloudDefaults();
+      setHeight(initial?.height ?? d.height);
+      setLayers(initial?.layers ?? d.layers);
+      setSegments(initial?.segments ?? d.segments);
+      setBaseColor(initial?.baseColor ?? d.baseColor);
+      setSpeed(initial?.speed ?? d.speed);
+      setSeed(initial?.seed ?? d.seed);
+      setBlur(initial?.blur ?? d.blur);
+      setWaveForm(initial?.waveForm ?? d.waveForm);
+      setNoiseSmoothness(initial?.noiseSmoothness ?? d.noiseSmoothness);
+      setAmplitudeJitter(initial?.amplitudeJitter ?? d.amplitudeJitter);
+      setAmplitudeJitterScale(initial?.amplitudeJitterScale ?? d.amplitudeJitterScale);
+      setAdditiveBlending(d.additiveBlending);
+      setCurveType(initial?.curveType ?? d.curveType);
+      setCurveTension(initial?.curveTension ?? d.curveTension);
+      setPeakStability(initial?.peakStability ?? d.peakStability);
+      setPeakNoiseDamping(initial?.peakNoiseDamping ?? d.peakNoiseDamping);
+      setPeakNoisePower(initial?.peakNoisePower ?? d.peakNoisePower);
+      setPeakHarmonicDamping(initial?.peakHarmonicDamping ?? d.peakHarmonicDamping);
+      setStaticPeaks(initial?.staticPeaks ?? d.staticPeaks);
+      setUseSharedBaseline(initial?.useSharedBaseline ?? d.useSharedBaseline);
+      setMorphStrength(initial?.morphStrength ?? d.morphStrength);
+      setMorphPeriodSec(initial?.morphPeriodSec ?? d.morphPeriodSec);
+      setAmplitudeEnvelopeStrength(initial?.amplitudeEnvelopeStrength ?? d.amplitudeEnvelopeStrength);
+      setAmplitudeEnvelopeCycles(initial?.amplitudeEnvelopeCycles ?? d.amplitudeEnvelopeCycles);
+      setSunsetMode(initial?.sunsetMode ?? d.sunsetMode);
+      setSunsetPeriodSec(initial?.sunsetPeriodSec ?? d.sunsetPeriodSec);
+      setPaletteIndex(d.paletteIndex);
+      setHueShift(d.hueShift);
+      setSaturation(d.saturation);
+      setLightness(d.lightness);
+      setContrast(d.contrast);
+      setAltHueDelta(d.altHueDelta);
+      setAltSatScale(d.altSatScale);
+     })();
+  }, [initial]);
+
+  const shuffle = () => { setSeed(Math.floor(Math.random() * 1e9)); };
+
+  const exportCloudConfig = React.useCallback(() => {
+    // Get the current effective parameters that would be passed to CloudMaker
+    const effectiveBaseColor = sunsetMode ? '#ffffff' : baseColor;
+    const layerTheme = sunsetMode ? getThemePalette(paletteNames[paletteIndex] || 'sunset', layers) : null;
+    const effectiveLayerColors = sunsetMode ? layerTheme?.colors : undefined;
+    const effectiveLayerOpacities = sunsetMode ? layerTheme?.opacities : undefined;
+
+    // Calculate effective roundness values (using default since UI controls removed)
+    const effRound = 0.3;
+    const effRoundPower = Math.max(1, Math.min(4, 3.5 - 2.0 * effRound));
+
+    const config = {
+      width,
+      height,
+      layers,
+      segments,
+      baseColor: effectiveBaseColor,
+      ...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {}),
+      ...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {}),
+      speed,
+      seed,
+      blur,
+      waveForm,
+      noiseSmoothness,
+      amplitudeJitter,
+      amplitudeJitterScale,
+      additiveBlending,
+      curveType,
+      curveTension,
+      peakStability,
+      peakNoiseDamping,
+      peakNoisePower,
+      peakHarmonicDamping,
+      useSharedBaseline,
+      morphStrength,
+      morphPeriodSec,
+      amplitudeEnvelopeStrength,
+      amplitudeEnvelopeCycles,
+      peakRoundness: effRound,
+      peakRoundnessPower: effRoundPower,
+      seamlessLoop: true,
+      animate: true,
+      background: solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false,
+      fit: 'stretch' as const,
+    };
+
+    // Create a formatted JSX snippet
+    const propsString = Object.entries(config)
+      .map(([key, value]) => {
+        if (value === undefined) return null;
+        if (typeof value === 'string') return `${key}="${value}"`;
+        if (Array.isArray(value)) return `${key}={${JSON.stringify(value)}}`;
+        return `${key}={${value}}`;
+      })
+      .filter(Boolean)
+      .join('\n        ');
+
+    const jsxSnippet = `<CloudMaker
+        ${propsString}
+        style={{ width: '100%', height: '100%' }}
+      />`;
+
+    // Copy to clipboard and show alert
+    navigator.clipboard.writeText(jsxSnippet).then(() => {
+      alert('CloudMaker configuration copied to clipboard!\n\n' + jsxSnippet);
+    }).catch(() => {
+      // Fallback: show in console and alert
+      console.log('CloudMaker Configuration:');
+      console.log(jsxSnippet);
+      alert('Configuration logged to console. Copy the JSX snippet from there.');
+    });
+  }, [
+    width, height, layers, segments, baseColor, speed, seed, blur, waveForm,
+    noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension,
+    peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline,
+    morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles,
+    sunsetMode, paletteIndex, solidBgEnabled, solidBgHue, solidBgSat, solidBgLight
+  ]);
+
+  const handleSaveTsx = React.useCallback(async () => {
+    const defaultPaletteColors: Record<string, string[]> = {};
+    paletteNames.forEach(paletteName => {
+      const palette = getThemePalette(paletteName, layers);
+      defaultPaletteColors[paletteName] = palette.colors;
+    });
+
+    await persistCloudDefaults({
+      width, height, layers, segments, baseColor, speed, seed, blur, waveForm,
+      noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending,
+      curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower,
+      peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec,
+      amplitudeEnvelopeStrength, amplitudeEnvelopeCycles,
+      staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation,
+      lightness, contrast, altHueDelta, altSatScale, defaultPaletteColors,
+    });
+  }, [
+    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale
+  ]);
+
+  // Sunset palette auto-cycling with smooth transitions
+  React.useEffect(() => {
+    if (!sunsetMode || !autoCyclePalettes) return;
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const elapsed = (t - t0) / 1000;
+      const period = Math.max(1, sunsetPeriodSec);
+      const totalCycle = elapsed / period;
+      const idx = Math.floor(totalCycle) % paletteNames.length;
+      const transitionT = totalCycle - Math.floor(totalCycle);
+      
+      setPaletteIndex(idx);
+      setSmoothTransitionT(transitionT);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); };
+  }, [sunsetMode, autoCyclePalettes, sunsetPeriodSec]);
+
+  // Helpers for background CSS composition
+  const mkLinear = (angle: number, stops: { color: string; pos: number }[]) =>
+    `linear-gradient(${angle}deg, ${stops.map(s => `${s.color} ${s.pos}%`).join(', ')})`;
 
   const containerStyle: React.CSSProperties = useMemo(() => {
     let bg = 'linear-gradient(180deg, #071122 0%, #0b1530 60%, #0e1838 100%)';
@@ -429,7 +523,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       overflow: 'hidden',
       background: bg
     };
-  }, [height, sunsetMode, themeForBackground, hexToHsl, paletteIndex, layers, autoCyclePalettes, smoothTransitionT, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]);
+  }, [height, sunsetMode, themeForBackground, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display: 'grid', gridTemplateRows: '1fr auto 1fr', minHeight: '100vh', width: '100%' }}>
@@ -445,6 +539,8 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         const effectiveCurveTension = staticPeaks ? 0.8 : curveTension;
         const effectiveNoiseSmoothness = staticPeaks ? Math.max(noiseSmoothness, 0.4) : noiseSmoothness;
         const effectiveAmplitudeJitter = staticPeaks ? 0 : amplitudeJitter;
+        // Effective mappings
+        const effLayerSpacing = Math.max(12, Math.min(24, layerSpacing));
         const effectivePeakStability = staticPeaks ? 1 : peakStability;
         const effectivePeakNoiseDamping = staticPeaks ? 1 : peakNoiseDamping;
         const effectivePeakNoisePower = staticPeaks ? Math.max(peakNoisePower, 4) : peakNoisePower;
@@ -481,8 +577,6 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
               morphPeriodSec={morphPeriodSec}
               amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
               amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
-              peakRoundness={peakRoundness}
-              peakRoundnessPower={peakRoundnessPower}
               seamlessLoop={seamlessLoop}
               background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
             />
@@ -516,14 +610,13 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
               morphPeriodSec={morphPeriodSec}
               amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
               amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
-              peakRoundness={peakRoundness}
-              peakRoundnessPower={peakRoundnessPower}
               seamlessLoop={seamlessLoop}
               background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
               baseAmplitude={topologyAmplitude}
               baseFrequency={topologyFrequency}
               layerFrequencyStep={topologyFreqStep}
               secondaryWaveFactor={topologySecondary}
+              layerVerticalSpacing={effLayerSpacing}
             />
           )
         ) : (<div style={{ width: '100%', height }} />);
@@ -580,7 +673,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     }}
                   >cycle</button>
                   {/* clouds on/off UI removed per request */}
-                  <button style={btn} onClick={() => setPaused(p => !p)}>{paused ? 'resume' : 'pause'}</button>
+                  <button style={btn} onClick={() => { setPaused(p => !p); }}>{paused ? 'resume' : 'pause'}</button>
                   <button style={btn} onClick={() => {
                     // Randomize UI-focused values only; keep height, speed, blur, structure knobs unchanged
                     setSeed(Math.floor(Math.random() * 1e9));
@@ -623,14 +716,14 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     setUseSharedBaseline(true);
                     setMorphStrength(0); setMorphPeriodSec(18);
                     setAmplitudeEnvelopeStrength(0.7); setAmplitudeEnvelopeCycles(10);
-                    setPeakRoundness(0.8); setPeakRoundnessPower(10);
                     setSunsetMode(false); setPaletteIndex(0);
                   }}>reset</button>
                   <button style={btn} onClick={handleSaveTsx}>save</button>
+                  <button style={btn} onClick={exportCloudConfig}>export config</button>
                   {isDev && (
                     <button
                       style={btn}
-                      onClick={() => setUsePackageEngine(v => !v)}
+                      onClick={() => { setUsePackageEngine(v => !v); }}
                     >engine: {usePackageEngine ? 'package' : 'local'}</button>
                   )}
                 </div>
@@ -647,14 +740,23 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'env-cycles', label: 'Envelope cycles', sectionId: 'palette', order: 23, type: 'slider', fullRow: true, render: () => <Row label="Envelope cycles"><Range min={1} max={10} step={1} value={amplitudeEnvelopeCycles} onChange={setAmplitudeEnvelopeCycles} /></Row> },
             // removed peak roundness and roundness power per UX request
 
-            { id: 'base-color', label: 'Base color', sectionId: 'appearance', order: 1, type: 'color', render: () => <Row label="Base color" right={<input type="color" value={baseColor} onChange={e => setBaseColor(e.target.value)} style={{ width: 36, height: 24, border: 'none', background: 'transparent', cursor: 'pointer' }} />} /> },
+            { id: 'base-color', label: 'Base color', sectionId: 'appearance', order: 1, type: 'color', render: () => (
+              <Row
+                label="Base color"
+                right={<input type="color" value={baseColor} disabled={sunsetMode} onChange={e => { setBaseColor(e.target.value); }} style={{ width: 36, height: 24, border: 'none', background: 'transparent', cursor: sunsetMode ? 'not-allowed' : 'pointer', opacity: sunsetMode ? 0.6 : 1 }} />}
+              >
+                {sunsetMode && <span style={{ fontSize: 11, opacity: 0.75 }}>Applies only when Sunset mode is off</span>}
+              </Row>
+            ) },
+            { id: 'tint', label: 'Palette tint', sectionId: 'appearance', order: 1.1, type: 'toggle', render: () => <Row label="Palette tint (sunset)"><Toggle checked={tintEnabled} onChange={setTintEnabled} /></Row> },
+            { id: 'tint-strength', label: 'Tint strength', sectionId: 'appearance', order: 1.2, type: 'slider', colSpan: 2, render: () => <Row label="Tint strength"><Range min={0} max={1} step={0.01} value={tintStrength} onChange={setTintStrength} /></Row> },
             { id: 'layers', label: 'Layers', sectionId: 'appearance', order: 2, type: 'slider', fullRow: true, render: () => <Row label="Layers"><Range min={3} max={12} value={layers} onChange={setLayers} /></Row> },
             // removed segments control per UX request
             { id: 'height', label: 'Height', sectionId: 'appearance', order: 4, type: 'slider', fullRow: true, render: () => <Row label="Height"><Range min={200} max={640} step={2} value={height} onChange={setHeight} /></Row> },
             { id: 'speed', label: 'Speed', sectionId: 'appearance', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Speed"><Range min={0} max={140} step={1} value={speed} onChange={setSpeed} /></Row> },
             { id: 'blur', label: 'Blur', sectionId: 'appearance', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Blur"><Range min={0} max={6} step={0.2} value={blur} onChange={setBlur} /></Row> },
 
-            { id: 'waveform', label: 'Wave form', sectionId: 'motion', order: 1, type: 'select', render: () => <Row label="Wave form" right={<select value={waveForm} onChange={e => setWaveForm(e.target.value as 'sin' | 'cos' | 'sincos' | 'round')} style={{ background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,.25)', borderRadius: 8, padding: '6px 8px' }}><option value="sincos">sin + harmonic</option><option value="sin">sin</option><option value="cos">cos</option><option value="round">rounded cos</option></select>} /> },
+            { id: 'waveform', label: 'Wave form', sectionId: 'motion', order: 1, type: 'select', render: () => <Row label="Wave form" right={<select value={waveForm} onChange={e => { setWaveForm(e.target.value as 'sin' | 'cos' | 'sincos' | 'round'); }} style={{ background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,.25)', borderRadius: 8, padding: '6px 8px' }}><option value="sincos">sin + harmonic</option><option value="sin">sin</option><option value="cos">cos</option><option value="round">rounded cos</option></select>} /> },
             // removed noise smoothness, amplitude jitter, and jitter scale per UX request
             { id: 'blend', label: 'Additive blending', sectionId: 'motion', order: 5, type: 'toggle', render: () => <Row label="Additive blending" right={<Toggle checked={additiveBlending} onChange={setAdditiveBlending} />} /> },
             // removed Curve type per UX request
@@ -691,7 +793,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                           key={`cur-${idx}`}
                           title={c}
                           style={{ height: 18, background: c, borderRadius: 4, border: '1px solid rgba(255,255,255,.35)', cursor: 'pointer' }}
-                          onPointerDown={() => setPaletteIndex(paletteIndex)}
+                          onPointerDown={() => { setPaletteIndex(paletteIndex); }}
                         />
                       ))}
                     </div>
@@ -704,7 +806,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                               key={`adj-${idx}`}
                               title={c}
                               style={{ height: 18, background: c, borderRadius: 4, border: '1px solid rgba(255,255,255,.35)', cursor: 'pointer' }}
-                              onPointerDown={() => setPaletteIndex(paletteIndex)}
+                              onPointerDown={() => { setPaletteIndex(paletteIndex); }}
                             />
                           ))}
                         </div>
@@ -720,13 +822,14 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'light', label: 'Lightness', sectionId: 'palette', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Lightness" icon={<Icon.palette size={14} />}><Range min={-0.5} max={0.5} step={0.01} value={lightness} onChange={setLightness} /></Row> },
             { id: 'ctr', label: 'Contrast', sectionId: 'palette', order: 4, type: 'slider', colSpan: 2, render: () => <Row label="Contrast" icon={<Icon.palette size={14} />}><Range min={-1} max={1} step={0.02} value={contrast} onChange={setContrast} /></Row> },
             // Topology-impacting sliders
-            { id: 'topo-amp', label: 'Wave amplitude', sectionId: 'key', order: 7, type: 'slider', colSpan: 2, render: () => <Row label="Wave amplitude"><Range min={6} max={36} step={0.5} value={topologyAmplitude} onChange={(v) => setTopologyAmplitude(v)} /></Row> },
-            { id: 'topo-freq', label: 'Base frequency', sectionId: 'key', order: 8, type: 'slider', colSpan: 2, render: () => <Row label="Base frequency"><Range min={0.01} max={0.08} step={0.001} value={topologyFrequency} onChange={(v) => setTopologyFrequency(v)} /></Row> },
-            { id: 'topo-step', label: 'Layer frequency step', sectionId: 'key', order: 9, type: 'slider', colSpan: 2, render: () => <Row label="Layer frequency step"><Range min={0.001} max={0.01} step={0.0005} value={topologyFreqStep} onChange={(v) => setTopologyFreqStep(v)} /></Row> },
-            { id: 'topo-harm', label: 'Secondary wave factor', sectionId: 'key', order: 10, type: 'slider', colSpan: 2, render: () => <Row label="Secondary wave factor"><Range min={0} max={1} step={0.01} value={topologySecondary} onChange={(v) => setTopologySecondary(v)} /></Row> },
+            { id: 'topo-amp', label: 'Wave amplitude', sectionId: 'key', order: 7, type: 'slider', colSpan: 2, render: () => <Row label="Wave amplitude"><Range min={0} max={50} step={0.5} value={topologyAmplitude} onChange={(v) => { setTopologyAmplitude(v); }} /></Row> },
+            { id: 'topo-freq', label: 'Base frequency', sectionId: 'key', order: 8, type: 'slider', colSpan: 2, render: () => <Row label="Base frequency"><Range min={0.01} max={0.08} step={0.001} value={topologyFrequency} onChange={(v) => { setTopologyFrequency(v); }} /></Row> },
+            { id: 'topo-step', label: 'Layer frequency step', sectionId: 'key', order: 9, type: 'slider', colSpan: 2, render: () => <Row label="Layer frequency step"><Range min={0.001} max={0.01} step={0.0005} value={topologyFreqStep} onChange={(v) => { setTopologyFreqStep(v); }} /></Row> },
+            { id: 'topo-harm', label: 'Secondary wave factor', sectionId: 'key', order: 10, type: 'slider', colSpan: 2, render: () => <Row label="Secondary wave factor"><Range min={0} max={1} step={0.01} value={topologySecondary} onChange={(v) => { setTopologySecondary(v); }} /></Row> },
+            { id: 'macro-spacing', label: 'Layer spacing', sectionId: 'key', order: 14, type: 'slider', colSpan: 2, render: () => <Row label="Layer spacing (px)"><Range min={12} max={24} step={1} value={layerSpacing} onChange={setLayerSpacing} /></Row> },
             { id: 'altdh', label: 'Alt hue Δ (odd layers)', sectionId: 'palette', order: 5, type: 'slider', fullRow: true, render: () => <Row label="Alt hue Δ (odd layers)" icon={<Icon.layers size={14} />}><Range min={-90} max={90} step={1} value={altHueDelta} onChange={setAltHueDelta} /></Row> },
             { id: 'altds', label: 'Alt sat × (odd layers)', sectionId: 'palette', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Alt sat × (odd layers)" icon={<Icon.layers size={14} />}><Range min={0.5} max={1.5} step={0.01} value={altSatScale} onChange={setAltSatScale} /></Row> },
-            { id: 'seed', label: 'Seed', sectionId: 'variation', order: 98, type: 'button', render: () => <Row label="Seed" right={<button style={btn} onClick={shuffle}>shuffle</button>}><input type="number" value={seed} onChange={e => setSeed(clamp(+e.target.value || 0, 0, 2 ** 31 - 1))} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }} /></Row> },
+            { id: 'seed', label: 'Seed', sectionId: 'variation', order: 98, type: 'button', render: () => <Row label="Seed" right={<button style={btn} onClick={shuffle}>shuffle</button>}><input type="number" value={seed} onChange={e => { setSeed(clamp(+e.target.value || 0, 0, 2 ** 31 - 1)); }} style={{ width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,.2)', color: 'inherit', padding: '6px 8px', borderRadius: 8 }} /></Row> },
 
             // Background controls
             { id: 'bg-solid-toggle', label: 'Solid background', sectionId: 'background', order: 0, type: 'toggle', render: () => <Row label="Solid background" right={<Toggle checked={solidBgEnabled} onChange={setSolidBgEnabled} />} /> },
@@ -743,7 +846,7 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       )}
       {!controlsVisible && (
         <div style={{ gridRow: 3, textAlign: 'center', marginTop: 8 }}>
-          <button onClick={() => setControlsVisible(true)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.06)', color: 'inherit' }}>menu</button>
+          <button onClick={() => { setControlsVisible(true); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.06)', color: 'inherit' }}>menu</button>
         </div>
       )}
     </div>

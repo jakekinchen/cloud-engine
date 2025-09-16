@@ -30,12 +30,11 @@ type Props = {
   baseFrequency?: number;
   layerFrequencyStep?: number;
   secondaryWaveFactor?: number;
+  layerVerticalSpacing?: number;
   morphStrength?: number;          // 0..1
   morphPeriodSec?: number;         // seconds
   amplitudeEnvelopeStrength?: number; // 0..1
   amplitudeEnvelopeCycles?: number;   // cycles across width
-  peakRoundness?: number;             // 0..1
-  peakRoundnessPower?: number;        // >=1
   seamlessLoop?: boolean;
   background?: false | string;        // solid background inside SVG
   paused?: boolean;                   // freeze animation time when true
@@ -69,12 +68,11 @@ const CloudBackdrop: React.FC<Props> = ({
   baseFrequency,
   layerFrequencyStep,
   secondaryWaveFactor,
+  layerVerticalSpacing,
   morphStrength = 0,
   morphPeriodSec = 12,
   amplitudeEnvelopeStrength = 0.3,
   amplitudeEnvelopeCycles = 4,
-  peakRoundness = 0.3,
-  peakRoundnessPower = 2,
   seamlessLoop = true,
   background = '#0b1530',
   paused = false,
@@ -101,6 +99,7 @@ const CloudBackdrop: React.FC<Props> = ({
         peakNoisePower,
         peakHarmonicDamping,
         useSharedBaseline,
+        ...(layerVerticalSpacing !== undefined ? { layerVerticalSpacing } : {}),
         ...(baseAmplitude !== undefined ? { baseAmplitude } : {}),
         ...(baseFrequency !== undefined ? { baseFrequency } : {}),
         ...(layerFrequencyStep !== undefined ? { layerFrequencyStep } : {}),
@@ -109,8 +108,6 @@ const CloudBackdrop: React.FC<Props> = ({
         morphPeriodSec,
         amplitudeEnvelopeStrength,
         amplitudeEnvelopeCycles,
-        peakRoundness,
-        peakRoundnessPower,
       }),
     [
       width,
@@ -135,12 +132,11 @@ const CloudBackdrop: React.FC<Props> = ({
       baseFrequency,
       layerFrequencyStep,
       secondaryWaveFactor,
+      layerVerticalSpacing,
       morphStrength,
       morphPeriodSec,
       amplitudeEnvelopeStrength,
       amplitudeEnvelopeCycles,
-      peakRoundness,
-      peakRoundnessPower,
     ]
   );
 

@@ -13,6 +13,25 @@ const mixToWhite = (hex, t) => {
   const m = v => Math.round(v + (255 - v) * t).toString(16).padStart(2, '0');
   return `#${m(r)}${m(g)}${m(b)}`;
 };
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const roundOpacity = v => Math.round(clamp01(v) * 1000) / 1000;
+const computeOpacityRamp = (count) => {
+  const n = Math.max(1, count | 0);
+  if (n === 1) return [roundOpacity(0.85)];
+  const front = clamp01(0.706 + 2.05 / n - 3.864 / (n * n));
+  const back = clamp01(0.0375 + 3.5175 / n - 4.41 / (n * n));
+  const start = Math.max(front, back);
+  const end = back;
+  const curve = 0.7 + Math.min(1.4, n / 7);
+  const result = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0 : i / (n - 1);
+    const eased = 1 - Math.pow(t, curve);
+    const opacity = end + (start - end) * eased;
+    result[i] = roundOpacity(opacity);
+  }
+  return result;
+};
 function mulberry32(a) { return function () { let t = a += 0x6D2B79F5; t = Math.imul(t ^ (t >>> 15), 1 | t); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 export function createCloudEngine(opts = {}) {
@@ -21,7 +40,7 @@ export function createCloudEngine(opts = {}) {
     baseAmplitude: 16, baseFrequency: 0.03, baseRandom: 6,
     layerAmplitudeStep: 2.6, layerFrequencyStep: 0.004, layerRandomStep: 1.2,
     layerVerticalSpacing: 16, secondaryWaveFactor: 0.45,
-    baseColor: '#ffffff', layerColors: [], blur: 2.2, seed: 1337,
+    baseColor: '#ffffff', layerColors: [], layerOpacities: undefined, blur: 2.2, seed: 1337,
     // New physicality controls
     waveForm: 'round',             // 'sin' | 'cos' | 'sincos' | 'round'
     noiseSmoothness: 0.45,         // 0..1 moving-average smoothing on noise
@@ -114,6 +133,17 @@ export function createCloudEngine(opts = {}) {
     cachedCycle = cycleIndex;
   };
   const colorAt = i => (o.layerColors && o.layerColors.length ? o.layerColors[Math.min(i, o.layerColors.length - 1)] : mixToWhite(o.baseColor, Math.min(0.08 * i, 0.6)));
+  const defaultOpacityRamp = computeOpacityRamp(o.layers);
+  const opacityAt = (i) => {
+    if (Array.isArray(o.layerOpacities) && o.layerOpacities.length) {
+      const idx = Math.min(i, o.layerOpacities.length - 1);
+      const candidate = o.layerOpacities[idx];
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return roundOpacity(candidate);
+      }
+    }
+    return defaultOpacityRamp[Math.min(i, defaultOpacityRamp.length - 1)];
+  };
 
   // Helpers to sample arrays with wrapping + linear interpolation
   const wrapIndex = (idx, len) => {
@@ -243,7 +273,7 @@ export function createCloudEngine(opts = {}) {
     return Array.from({ length: o.layers }, (_, i) => ({
       d: pathFor(i, phase, morphT),
       fill: colorAt(i),
-      opacity: +(1 - i * 0.12).toFixed(2)
+      opacity: opacityAt(i)
     }));
   };
 
@@ -263,4 +293,3 @@ export function createCloudEngine(opts = {}) {
 
   return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, config: o };
 }
-

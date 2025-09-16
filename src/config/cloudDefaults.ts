@@ -23,8 +23,6 @@ export type CloudDefaults = {
   morphPeriodSec: number;
   amplitudeEnvelopeStrength: number;
   amplitudeEnvelopeCycles: number;
-  peakRoundness: number;
-  peakRoundnessPower: number;
   staticPeaks: boolean;
   sunsetMode: boolean;
   sunsetPeriodSec: number;
@@ -65,8 +63,6 @@ export const defaultCloudDefaults: CloudDefaults = {
   morphPeriodSec: 18,
   amplitudeEnvelopeStrength: 0.7,
   amplitudeEnvelopeCycles: 10,
-  peakRoundness: 0.8,
-  peakRoundnessPower: 10,
   staticPeaks: true,
   sunsetMode: false,
   sunsetPeriodSec: 12,
