@@ -26,7 +26,7 @@ const computeOpacityRamp = (count) => {
   const result = new Array(n);
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0 : i / (n - 1);
-    const eased = 1 - Math.pow(t, curve);
+    const eased = 1 - Math.pow(t, curve); // keep front layers lighter when count grows
     const opacity = end + (start - end) * eased;
     result[i] = roundOpacity(opacity);
   }

@@ -45,7 +45,7 @@ declare function createCloudEngine(opts?: {}): {
     pathsAt: (phase?: number, morphT?: number, cycleIndex?: number) => {
         d: string;
         fill: string | undefined;
-        opacity: number;
+        opacity: any;
     }[];
     svgAt: (phase?: number) => string;
     width: number;
@@ -66,6 +66,7 @@ declare function createCloudEngine(opts?: {}): {
         secondaryWaveFactor: number;
         baseColor: string;
         layerColors: never[];
+        layerOpacities: undefined;
         blur: number;
         seed: number;
         waveForm: string;

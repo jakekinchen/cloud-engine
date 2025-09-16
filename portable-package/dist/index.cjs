@@ -49,6 +49,7 @@ function createCloudEngine(opts = {}) {
     secondaryWaveFactor: 0.45,
     baseColor: "#ffffff",
     layerColors: [],
+    layerOpacities: void 0,
     blur: 2.2,
     seed: 1337,
     // New physicality controls
@@ -159,6 +160,17 @@ function createCloudEngine(opts = {}) {
     cachedCycle = cycleIndex;
   };
   const colorAt = (i) => o.layerColors && o.layerColors.length ? o.layerColors[Math.min(i, o.layerColors.length - 1)] : mixToWhite(o.baseColor, Math.min(0.08 * i, 0.6));
+  const defaultOpacityRamp = computeOpacityRamp(o.layers);
+  const opacityAt = (i) => {
+    if (Array.isArray(o.layerOpacities) && o.layerOpacities.length) {
+      const idx = Math.min(i, o.layerOpacities.length - 1);
+      const candidate = o.layerOpacities[idx];
+      if (typeof candidate === "number" && Number.isFinite(candidate)) {
+        return roundOpacity(candidate);
+      }
+    }
+    return defaultOpacityRamp[Math.min(i, defaultOpacityRamp.length - 1)];
+  };
   const wrapIndex = (idx, len) => {
     let i = idx % len;
     if (i < 0) i += len;
@@ -273,7 +285,7 @@ function createCloudEngine(opts = {}) {
     return Array.from({ length: o.layers }, (_, i) => ({
       d: pathFor(i, phase, morphT),
       fill: colorAt(i),
-      opacity: +(1 - i * 0.12).toFixed(2)
+      opacity: opacityAt(i)
     }));
   };
   const svgAt = (phase = 0) => {
@@ -291,7 +303,7 @@ function createCloudEngine(opts = {}) {
   };
   return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, config: o };
 }
-var rnd, mixToWhite;
+var rnd, mixToWhite, clamp01, roundOpacity, computeOpacityRamp;
 var init_cloud_maker = __esm({
   "cloud_maker.js"() {
     "use strict";
@@ -302,6 +314,25 @@ var init_cloud_maker = __esm({
       const n = parseInt(h, 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
       const m = (v) => Math.round(v + (255 - v) * t).toString(16).padStart(2, "0");
       return `#${m(r)}${m(g)}${m(b)}`;
+    };
+    clamp01 = (v) => Math.max(0, Math.min(1, v));
+    roundOpacity = (v) => Math.round(clamp01(v) * 1e3) / 1e3;
+    computeOpacityRamp = (count) => {
+      const n = Math.max(1, count | 0);
+      if (n === 1) return [roundOpacity(0.85)];
+      const front = clamp01(0.706 + 2.05 / n - 3.864 / (n * n));
+      const back = clamp01(0.0375 + 3.5175 / n - 4.41 / (n * n));
+      const start = Math.max(front, back);
+      const end = back;
+      const curve = 0.7 + Math.min(1.4, n / 7);
+      const result = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0 : i / (n - 1);
+        const eased = 1 - Math.pow(t, curve);
+        const opacity = end + (start - end) * eased;
+        result[i] = roundOpacity(opacity);
+      }
+      return result;
     };
   }
 });
@@ -423,7 +454,9 @@ var CloudMaker = ({
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+    };
   }, [engine, speed, animate, seamlessLoop]);
   const preserve = fit === "stretch" ? "none" : fit === "slice" ? "xMidYMid slice" : "xMidYMid meet";
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(

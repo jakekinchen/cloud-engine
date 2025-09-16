@@ -1,7 +1,7 @@
 {
   "width": 800,
   "height": 458,
-  "layers": 6,
+  "layers": 5,
   "segments": 450,
   "baseColor": "#ffffff",
   "speed": 34,
@@ -23,8 +23,6 @@
   "morphPeriodSec": 18,
   "amplitudeEnvelopeStrength": 0.36,
   "amplitudeEnvelopeCycles": 2,
-  "peakRoundness": 0.8,
-  "peakRoundnessPower": 10,
   "staticPeaks": true,
   "sunsetMode": true,
   "sunsetPeriodSec": 12,
