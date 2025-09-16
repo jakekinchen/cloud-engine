@@ -356,7 +356,7 @@ init_cloud_maker();
 var cloudDefaults_default = {
   width: 800,
   height: 458,
-  layers: 6,
+  layers: 5,
   segments: 450,
   baseColor: "#ffffff",
   speed: 34,
@@ -378,8 +378,6 @@ var cloudDefaults_default = {
   morphPeriodSec: 18,
   amplitudeEnvelopeStrength: 0.36,
   amplitudeEnvelopeCycles: 2,
-  peakRoundness: 0.8,
-  peakRoundnessPower: 10,
   staticPeaks: true,
   sunsetMode: true,
   sunsetPeriodSec: 12,
@@ -421,8 +419,6 @@ var CloudMaker = ({
   morphPeriodSec = cloudDefaults_default.morphPeriodSec,
   amplitudeEnvelopeStrength = cloudDefaults_default.amplitudeEnvelopeStrength,
   amplitudeEnvelopeCycles = cloudDefaults_default.amplitudeEnvelopeCycles,
-  peakRoundness = cloudDefaults_default.peakRoundness,
-  peakRoundnessPower = cloudDefaults_default.peakRoundnessPower,
   seamlessLoop = true,
   animate = true,
   phase = 0,
@@ -434,8 +430,8 @@ var CloudMaker = ({
   background = false
 }) => {
   const engine = (0, import_react.useMemo)(
-    () => createCloudEngine({ width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower }),
-    [width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, peakRoundness, peakRoundnessPower]
+    () => createCloudEngine({ width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles }),
+    [width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles]
   );
   const initial = (0, import_react.useMemo)(() => engine.pathsAt(phase, morphT, cycleIndex), [engine, phase, morphT, cycleIndex]);
   const refs = (0, import_react.useRef)([]);

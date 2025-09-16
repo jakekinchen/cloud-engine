@@ -92,7 +92,7 @@ declare function createCloudEngine(opts?: {}): {
 
 var width = 800;
 var height = 458;
-var layers = 6;
+var layers = 5;
 var segments = 450;
 var baseColor = "#ffffff";
 var speed = 34;
@@ -114,8 +114,6 @@ var morphStrength = 0;
 var morphPeriodSec = 18;
 var amplitudeEnvelopeStrength = 0.36;
 var amplitudeEnvelopeCycles = 2;
-var peakRoundness = 0.8;
-var peakRoundnessPower = 10;
 var staticPeaks = true;
 var sunsetMode = true;
 var sunsetPeriodSec = 12;
@@ -151,8 +149,6 @@ var cloudDefaults = {
 	morphPeriodSec: morphPeriodSec,
 	amplitudeEnvelopeStrength: amplitudeEnvelopeStrength,
 	amplitudeEnvelopeCycles: amplitudeEnvelopeCycles,
-	peakRoundness: peakRoundness,
-	peakRoundnessPower: peakRoundnessPower,
 	staticPeaks: staticPeaks,
 	sunsetMode: sunsetMode,
 	sunsetPeriodSec: sunsetPeriodSec,
