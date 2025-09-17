@@ -11,6 +11,9 @@
   "noiseSmoothness": 0.45,
   "amplitudeJitter": 0,
   "amplitudeJitterScale": 0.25,
+  "backOpacity": 0.12,
+  "frontOpacity": 0.96,
+  "opacityCurvePower": 2.4,
   "additiveBlending": false,
   "curveType": "spline",
   "curveTension": 0.85,
@@ -32,5 +35,10 @@
   "lightness": 0.02,
   "contrast": 0.04,
   "altHueDelta": -30,
-  "altSatScale": 1.41
+  "altSatScale": 1.41,
+  "motionAngleDeg": 0,
+  "periodicAngleDeg": 0,
+  "glowEnabled": false,
+  "glowIntensity": 1,
+  "glowHueShift": 180
 }

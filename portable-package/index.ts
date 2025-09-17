@@ -18,6 +18,9 @@ export type CloudConfig = Partial<{
   noiseSmoothness: number;
   amplitudeJitter: number;
   amplitudeJitterScale: number;
+  backOpacity: number;
+  frontOpacity: number;
+  opacityCurvePower: number;
   curveType: 'linear' | 'spline';
   curveTension: number;
   peakStability: number;
@@ -25,12 +28,22 @@ export type CloudConfig = Partial<{
   peakNoisePower: number;
   peakHarmonicDamping: number;
   useSharedBaseline: boolean;
+  baseAmplitude: number;
+  baseFrequency: number;
+  layerFrequencyStep: number;
+  secondaryWaveFactor: number;
+  layerVerticalSpacing: number;
   morphStrength: number;
   morphPeriodSec: number;
   amplitudeEnvelopeStrength: number;
   amplitudeEnvelopeCycles: number;
   peakRoundness: number;
   peakRoundnessPower: number;
+  motionAngleDeg: number;
+  periodicAngleDeg: number;
+  glowEnabled: boolean;
+  glowIntensity: number;
+  glowHueShift: number;
 }>;
 
 export function renderSvg(config: CloudConfig = {}, opts: { phase?: number; morphT?: number; cycleIndex?: number } = {}) {
@@ -52,6 +65,9 @@ export const presets = {
     noiseSmoothness: 0.45,
     amplitudeJitter: 0,
     amplitudeJitterScale: 0.25,
+    backOpacity: 0.12,
+    frontOpacity: 0.96,
+    opacityCurvePower: 2.4,
     curveType: 'spline' as const,
     curveTension: 0.85,
     peakStability: 1,
@@ -67,5 +83,3 @@ export const presets = {
     peakRoundnessPower: 10,
   },
 };
-
-

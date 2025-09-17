@@ -27,8 +27,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "cloud-engine": ["./portable-package/dist"],
-      "cloud-engine/*": ["./portable-package/dist/*"]
+      "cloud-engine": ["./portable-package"],
+      "cloud-engine/*": ["./portable-package/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

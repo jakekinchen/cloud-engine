@@ -16,6 +16,9 @@ type CloudMakerProps = {
     amplitudeJitter?: number;
     amplitudeJitterScale?: number;
     additiveBlending?: boolean;
+    backOpacity?: number;
+    frontOpacity?: number;
+    opacityCurvePower?: number;
     curveType?: 'linear' | 'spline';
     curveTension?: number;
     peakStability?: number;
@@ -23,6 +26,11 @@ type CloudMakerProps = {
     peakNoisePower?: number;
     peakHarmonicDamping?: number;
     useSharedBaseline?: boolean;
+    baseAmplitude?: number;
+    baseFrequency?: number;
+    layerFrequencyStep?: number;
+    secondaryWaveFactor?: number;
+    layerVerticalSpacing?: number;
     morphStrength?: number;
     morphPeriodSec?: number;
     amplitudeEnvelopeStrength?: number;
@@ -38,12 +46,19 @@ type CloudMakerProps = {
     style?: React.CSSProperties;
     fit?: 'stretch' | 'meet' | 'slice';
     background?: false | string;
+    motionAngleDeg?: number;
+    periodicAngleDeg?: number;
+    paused?: boolean;
+    glowEnabled?: boolean;
+    glowIntensity?: number;
+    glowHueShift?: number;
 };
 declare const CloudMaker: React.FC<CloudMakerProps>;
 
 declare function createCloudEngine(opts?: {}): {
     pathsAt: (phase?: number, morphT?: number, cycleIndex?: number) => {
         d: string;
+        topPath: string;
         fill: string | undefined;
         opacity: any;
     }[];
@@ -51,6 +66,7 @@ declare function createCloudEngine(opts?: {}): {
     width: number;
     height: number;
     blur: number;
+    opacityRamp: any[];
     config: {
         width: number;
         height: number;
@@ -69,6 +85,9 @@ declare function createCloudEngine(opts?: {}): {
         layerOpacities: undefined;
         blur: number;
         seed: number;
+        backOpacity: number;
+        frontOpacity: number;
+        opacityCurvePower: number;
         waveForm: string;
         noiseSmoothness: number;
         amplitudeJitter: number;
@@ -87,6 +106,8 @@ declare function createCloudEngine(opts?: {}): {
         peakRoundness: number;
         peakRoundnessPower: number;
         amplitudeLayerCycleVariance: number;
+        motionAngleDeg: number;
+        periodicAngleDeg: number;
     };
 };
 
@@ -102,6 +123,9 @@ var waveForm = "round";
 var noiseSmoothness = 0.45;
 var amplitudeJitter = 0;
 var amplitudeJitterScale = 0.25;
+var backOpacity = 0.12;
+var frontOpacity = 0.96;
+var opacityCurvePower = 2.4;
 var additiveBlending = false;
 var curveType = "spline";
 var curveTension = 0.85;
@@ -124,6 +148,11 @@ var lightness = 0.02;
 var contrast = 0.04;
 var altHueDelta = -30;
 var altSatScale = 1.41;
+var motionAngleDeg = 0;
+var periodicAngleDeg = 0;
+var glowEnabled = false;
+var glowIntensity = 1;
+var glowHueShift = 180;
 var cloudDefaults = {
 	width: width,
 	height: height,
@@ -137,6 +166,9 @@ var cloudDefaults = {
 	noiseSmoothness: noiseSmoothness,
 	amplitudeJitter: amplitudeJitter,
 	amplitudeJitterScale: amplitudeJitterScale,
+	backOpacity: backOpacity,
+	frontOpacity: frontOpacity,
+	opacityCurvePower: opacityCurvePower,
 	additiveBlending: additiveBlending,
 	curveType: curveType,
 	curveTension: curveTension,
@@ -158,7 +190,12 @@ var cloudDefaults = {
 	lightness: lightness,
 	contrast: contrast,
 	altHueDelta: altHueDelta,
-	altSatScale: altSatScale
+	altSatScale: altSatScale,
+	motionAngleDeg: motionAngleDeg,
+	periodicAngleDeg: periodicAngleDeg,
+	glowEnabled: glowEnabled,
+	glowIntensity: glowIntensity,
+	glowHueShift: glowHueShift
 };
 
 type CloudConfig = Partial<{
@@ -175,6 +212,9 @@ type CloudConfig = Partial<{
     noiseSmoothness: number;
     amplitudeJitter: number;
     amplitudeJitterScale: number;
+    backOpacity: number;
+    frontOpacity: number;
+    opacityCurvePower: number;
     curveType: 'linear' | 'spline';
     curveTension: number;
     peakStability: number;
@@ -182,12 +222,22 @@ type CloudConfig = Partial<{
     peakNoisePower: number;
     peakHarmonicDamping: number;
     useSharedBaseline: boolean;
+    baseAmplitude: number;
+    baseFrequency: number;
+    layerFrequencyStep: number;
+    secondaryWaveFactor: number;
+    layerVerticalSpacing: number;
     morphStrength: number;
     morphPeriodSec: number;
     amplitudeEnvelopeStrength: number;
     amplitudeEnvelopeCycles: number;
     peakRoundness: number;
     peakRoundnessPower: number;
+    motionAngleDeg: number;
+    periodicAngleDeg: number;
+    glowEnabled: boolean;
+    glowIntensity: number;
+    glowHueShift: number;
 }>;
 declare function renderSvg(config?: CloudConfig, opts?: {
     phase?: number;
@@ -207,6 +257,9 @@ declare const presets: {
         noiseSmoothness: number;
         amplitudeJitter: number;
         amplitudeJitterScale: number;
+        backOpacity: number;
+        frontOpacity: number;
+        opacityCurvePower: number;
         curveType: "spline";
         curveTension: number;
         peakStability: number;

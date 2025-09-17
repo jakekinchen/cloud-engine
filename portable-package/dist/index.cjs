@@ -52,6 +52,9 @@ function createCloudEngine(opts = {}) {
     layerOpacities: void 0,
     blur: 2.2,
     seed: 1337,
+    backOpacity: 0.12,
+    frontOpacity: 0.96,
+    opacityCurvePower: 2.4,
     // New physicality controls
     waveForm: "round",
     // 'sin' | 'cos' | 'sincos' | 'round'
@@ -90,6 +93,10 @@ function createCloudEngine(opts = {}) {
     // >=1 tightness of peak-local smoothing
     amplitudeLayerCycleVariance: 0.2,
     // 0..1 per-layer amplitude scale variance per cycle
+    // Motion path orientation (degrees). 0 = horizontal (default). +tilts upward, -tilts downward.
+    motionAngleDeg: 0,
+    // Phase sampling rotation (degrees). 0 = standard sampling, rotates phase coordinate system
+    periodicAngleDeg: 0,
     ...opts
   };
   const center = o.width / 2;
@@ -160,7 +167,12 @@ function createCloudEngine(opts = {}) {
     cachedCycle = cycleIndex;
   };
   const colorAt = (i) => o.layerColors && o.layerColors.length ? o.layerColors[Math.min(i, o.layerColors.length - 1)] : mixToWhite(o.baseColor, Math.min(0.08 * i, 0.6));
-  const defaultOpacityRamp = computeOpacityRamp(o.layers);
+  const defaultOpacityRamp = computeOpacityRamp(o.layers, {
+    backOpacity: o.backOpacity,
+    frontOpacity: o.frontOpacity,
+    opacityCurvePower: o.opacityCurvePower
+  });
+  o.opacityRamp = defaultOpacityRamp;
   const opacityAt = (i) => {
     if (Array.isArray(o.layerOpacities) && o.layerOpacities.length) {
       const idx = Math.min(i, o.layerOpacities.length - 1);
@@ -202,91 +214,108 @@ function createCloudEngine(opts = {}) {
     const p = params(i);
     const fillBase = o.useSharedBaseline ? o.height : p.baseLine;
     const pts = [];
+    const motionTheta = (o.motionAngleDeg || 0) * Math.PI / 180;
+    const motionCosT = Math.cos(motionTheta);
+    const motionSinT = Math.sin(motionTheta);
+    const motionInvCos = 1 / Math.max(1e-3, Math.abs(motionCosT));
+    const periodicTheta = (o.periodicAngleDeg || 0) * Math.PI / 180;
+    const periodicCosT = Math.cos(periodicTheta);
+    const periodicSinT = Math.sin(periodicTheta);
+    const periodicInvCos = 1 / Math.max(1e-3, Math.abs(periodicCosT));
+    const tMotionOfX = (x) => Math.abs(x - center) * motionInvCos;
+    const tPeriodicOf = (x, y) => Math.abs(x - center) * periodicCosT + (y - p.baseLine) * periodicSinT;
+    const tPeriodicNormOf = (x, y) => (tPeriodicOf(x, y) - phase) * periodicInvCos;
+    const m = Math.max(0, Math.min(1, o.morphStrength)) * (0.5 - 0.5 * Math.cos(2 * Math.PI * morphT));
+    const envBase = cachedFields.envelopePhases[i] + i * 0.37;
+    const segPerW = o.segments / Math.max(1, o.width);
+    const waveAt = (arg) => {
+      if (o.waveForm === "sin") return Math.sin(arg);
+      if (o.waveForm === "cos") return Math.cos(arg);
+      if (o.waveForm === "round") {
+        const c = Math.cos(arg);
+        return c / (0.4 + 0.4 * Math.abs(c));
+      }
+      const base = Math.sin(arg);
+      const harmonic = Math.sin(2 * arg + p.phi * 0.3);
+      const peakP = Math.pow(Math.abs(Math.cos(arg)), Math.max(1, o.peakNoisePower));
+      const harmScale = 1 - o.peakHarmonicDamping * (1 - peakP);
+      return base + o.secondaryWaveFactor * harmScale * harmonic;
+    };
     for (let k = 0; k <= o.segments; k++) {
       const x = k / o.segments * o.width;
-      const dist = Math.abs(x - center);
-      const baseArg = p.freq * (dist - phase) + p.phi;
-      let wave = 0;
-      if (o.waveForm === "sin") {
-        wave = Math.sin(baseArg);
-      } else if (o.waveForm === "cos") {
-        wave = Math.cos(baseArg);
-      } else if (o.waveForm === "round") {
-        const c = Math.cos(baseArg);
-        wave = c / (0.4 + 0.4 * Math.abs(c));
-      } else {
-        const base = Math.sin(baseArg);
-        const harmonic = Math.sin(2 * baseArg + p.phi * 0.3);
-        const peakProximity2 = Math.pow(Math.abs(Math.cos(baseArg)), Math.max(1, o.peakNoisePower));
-        const harmonicScale = 1 - o.peakHarmonicDamping * (1 - peakProximity2);
-        wave = base + o.secondaryWaveFactor * harmonicScale * harmonic;
+      const tMotion = tMotionOfX(x);
+      const yBase = p.baseLine + tMotion * motionSinT;
+      let sn = tPeriodicNormOf(x, yBase);
+      let arg = p.freq * sn + p.phi;
+      for (let iter = 0; iter < 3; iter++) {
+        const peakP = Math.pow(Math.abs(Math.cos(arg)), Math.max(1, o.peakNoisePower));
+        const noiseScale = 1 - o.peakNoiseDamping * (1 - peakP);
+        const ridx = sn * segPerW;
+        const stableNoise = sampleMorph(cachedFields.noisesA[i], cachedFields.noisesB[i], ridx, m);
+        const stableAmpMod = sampleMorph(cachedFields.ampModsA[i], cachedFields.ampModsB[i], ridx, m);
+        const mixedNoise = ((1 - o.peakStability) * (p.noise[k] || 0) + o.peakStability * stableNoise) * noiseScale;
+        const mixedAmpMod = ((1 - o.peakStability) * (cachedFields.ampModsA[i][k] || 0) + o.peakStability * stableAmpMod) * noiseScale;
+        const envStrength = o.amplitudeEnvelopeStrength * (0.9 + 0.2 * (i * 16807 % 11) / 10);
+        const env = 1 + envStrength * Math.sin(2 * Math.PI * o.amplitudeEnvelopeCycles * sn / Math.max(1, o.width) + envBase);
+        const baseAmp = p.amp * (cachedFields.ampLayerScale[i] || 1) * env;
+        const ampMult = 1 + o.amplitudeJitter * mixedAmpMod;
+        const wave = waveAt(arg);
+        const w = baseAmp * ampMult * wave + mixedNoise * p.rndF;
+        const yNew = yBase - w;
+        sn = tPeriodicNormOf(x, yNew);
+        arg = p.freq * sn + p.phi;
+        if (iter === 2) {
+          pts.push({ x, y: yNew });
+        }
       }
-      const peakProximity = Math.pow(Math.abs(Math.cos(baseArg)), Math.max(1, o.peakNoisePower));
-      const noiseScale = 1 - o.peakNoiseDamping * (1 - peakProximity);
-      const radialIdx = (dist - phase) * (o.segments / Math.max(1, o.width));
-      const m = Math.max(0, Math.min(1, o.morphStrength)) * (0.5 - 0.5 * Math.cos(2 * Math.PI * morphT));
-      const stableNoise = sampleMorph(cachedFields.noisesA[i], cachedFields.noisesB[i], radialIdx, m);
-      const stableAmpMod = sampleMorph(cachedFields.ampModsA[i], cachedFields.ampModsB[i], radialIdx, m);
-      const mixedNoise = ((1 - o.peakStability) * (p.noise[k] || 0) + o.peakStability * stableNoise) * noiseScale;
-      const mixedAmpMod = ((1 - o.peakStability) * (cachedFields.ampModsA[i][k] || 0) + o.peakStability * stableAmpMod) * noiseScale;
-      const envStrength = o.amplitudeEnvelopeStrength * (0.9 + 0.2 * (i * 16807 % 11) / 10);
-      const env2 = 1 + envStrength * Math.sin(
-        2 * Math.PI * o.amplitudeEnvelopeCycles * (dist - phase) / Math.max(1, o.width) + (cachedFields.envelopePhases[i] + i * 0.37)
-      );
-      const baseAmp = p.amp * (cachedFields.ampLayerScale[i] || 1) * env2;
-      const ampMult = 1 + o.amplitudeJitter * mixedAmpMod;
-      const w = baseAmp * ampMult * wave + mixedNoise * p.rndF;
-      pts.push({ x, y: p.baseLine - w });
-    }
-    if (o.curveType === "linear") {
-      let d2 = `M 0 ${rnd(fillBase)}`;
-      d2 += ` L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
-      for (let idx = 1; idx < pts.length; idx++) {
-        const pt = pts[idx];
-        d2 += ` L ${rnd(pt.x)} ${rnd(pt.y)}`;
-      }
-      return d2 + ` L ${o.width} ${rnd(fillBase)} Z`;
     }
     if (o.peakRoundness > 0) {
       const power = Math.max(1, o.peakRoundnessPower || 1);
       const rounded = new Array(pts.length);
       for (let k = 0; k < pts.length; k++) {
-        const x = pts[k].x;
-        const dist = Math.abs(x - center);
-        const baseArg = p.freq * (dist - phase) + p.phi;
-        const peakWeight = Math.pow(1 - Math.abs(Math.cos(baseArg)), power);
-        const w = Math.max(0, Math.min(1, o.peakRoundness * peakWeight));
-        const yPrev = pts[Math.max(0, k - 1)].y;
-        const yCurr = pts[k].y;
-        const yNext = pts[Math.min(pts.length - 1, k + 1)].y;
-        const neighborhoodAvg = (yPrev + yCurr + yNext) / 3;
-        const yRounded = yCurr * (1 - w) + neighborhoodAvg * w;
-        rounded[k] = { x, y: yRounded };
+        const x = pts[k].x, y = pts[k].y;
+        const sn = tPeriodicNormOf(x, y);
+        const arg = p.freq * sn + p.phi;
+        const peakW = Math.pow(1 - Math.abs(Math.cos(arg)), power);
+        const w = Math.max(0, Math.min(1, o.peakRoundness * peakW));
+        const yPrev = pts[Math.max(0, k - 1)].y, yNext = pts[Math.min(pts.length - 1, k + 1)].y;
+        const avg = (yPrev + y + yNext) / 3;
+        rounded[k] = { x, y: y * (1 - w) + avg * w };
       }
       for (let k = 0; k < pts.length; k++) pts[k] = rounded[k];
     }
-    const t = Math.max(0, Math.min(1, o.curveTension));
-    let d = `M 0 ${rnd(fillBase)} L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
+    const tSmooth = Math.max(0, Math.min(1, o.curveTension));
+    let topPath = `M ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
+    let fillPath = `M 0 ${rnd(fillBase)} L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
     for (let s = 0; s < pts.length - 1; s++) {
       const p0 = pts[s - 1] || pts[s];
       const p1 = pts[s];
       const p2 = pts[s + 1];
       const p3 = pts[s + 2] || p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 6 * t;
-      const cp1y = p1.y + (p2.y - p0.y) / 6 * t;
-      const cp2x = p2.x - (p3.x - p1.x) / 6 * t;
-      const cp2y = p2.y - (p3.y - p1.y) / 6 * t;
-      d += ` C ${rnd(cp1x)} ${rnd(cp1y)} ${rnd(cp2x)} ${rnd(cp2y)} ${rnd(p2.x)} ${rnd(p2.y)}`;
+      const cp1x = p1.x + (p2.x - p0.x) / 6 * tSmooth;
+      const cp1y = p1.y + (p2.y - p0.y) / 6 * tSmooth;
+      const cp2x = p2.x - (p3.x - p1.x) / 6 * tSmooth;
+      const cp2y = p2.y - (p3.y - p1.y) / 6 * tSmooth;
+      const seg = ` C ${rnd(cp1x)} ${rnd(cp1y)} ${rnd(cp2x)} ${rnd(cp2y)} ${rnd(p2.x)} ${rnd(p2.y)}`;
+      topPath += seg;
+      fillPath += seg;
     }
-    return d + ` L ${o.width} ${rnd(fillBase)} Z`;
+    return {
+      fillPath: fillPath + ` L ${o.width} ${rnd(fillBase)} Z`,
+      topPath
+    };
   };
   const pathsAt = (phase = 0, morphT = 0, cycleIndex = 0) => {
     ensureFields(Math.max(0, Math.floor(cycleIndex)));
-    return Array.from({ length: o.layers }, (_, i) => ({
-      d: pathFor(i, phase, morphT),
-      fill: colorAt(i),
-      opacity: opacityAt(i)
-    }));
+    return Array.from({ length: o.layers }, (_, i) => {
+      const pathData = pathFor(i, phase, morphT);
+      return {
+        d: pathData.fillPath,
+        topPath: pathData.topPath,
+        fill: colorAt(i),
+        opacity: opacityAt(i)
+      };
+    });
   };
   const svgAt = (phase = 0) => {
     const paths = pathsAt(phase).map((p) => `<path d="${p.d}" fill="${p.fill}" fill-opacity="${p.opacity}"/>`).join("\n      ");
@@ -301,7 +330,7 @@ function createCloudEngine(opts = {}) {
       </g>
     </svg>`;
   };
-  return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, config: o };
+  return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, opacityRamp: defaultOpacityRamp, config: o };
 }
 var rnd, mixToWhite, clamp01, roundOpacity, computeOpacityRamp;
 var init_cloud_maker = __esm({
@@ -317,19 +346,21 @@ var init_cloud_maker = __esm({
     };
     clamp01 = (v) => Math.max(0, Math.min(1, v));
     roundOpacity = (v) => Math.round(clamp01(v) * 1e3) / 1e3;
-    computeOpacityRamp = (count) => {
+    computeOpacityRamp = (count, opts = {}) => {
       const n = Math.max(1, count | 0);
-      if (n === 1) return [roundOpacity(0.85)];
-      const front = clamp01(0.706 + 2.05 / n - 3.864 / (n * n));
-      const back = clamp01(0.0375 + 3.5175 / n - 4.41 / (n * n));
-      const start = Math.max(front, back);
-      const end = back;
-      const curve = 0.7 + Math.min(1.4, n / 7);
+      const front = clamp01(Number.isFinite(opts.frontOpacity) ? opts.frontOpacity : 0.96);
+      const back = clamp01(Number.isFinite(opts.backOpacity) ? opts.backOpacity : 0.12);
+      const powerRaw = Number.isFinite(opts.opacityCurvePower) ? opts.opacityCurvePower : 2.4;
+      const power = Math.max(1e-3, powerRaw);
+      if (n === 1) {
+        return [roundOpacity(front)];
+      }
+      const delta = front - back;
       const result = new Array(n);
       for (let i = 0; i < n; i++) {
-        const t = n === 1 ? 0 : i / (n - 1);
-        const eased = 1 - Math.pow(t, curve);
-        const opacity = end + (start - end) * eased;
+        const t = n === 1 ? 1 : i / (n - 1);
+        const eased = Math.pow(t, power);
+        const opacity = back + delta * eased;
         result[i] = roundOpacity(opacity);
       }
       return result;
@@ -366,6 +397,9 @@ var cloudDefaults_default = {
   noiseSmoothness: 0.45,
   amplitudeJitter: 0,
   amplitudeJitterScale: 0.25,
+  backOpacity: 0.12,
+  frontOpacity: 0.96,
+  opacityCurvePower: 2.4,
   additiveBlending: false,
   curveType: "spline",
   curveTension: 0.85,
@@ -387,11 +421,81 @@ var cloudDefaults_default = {
   lightness: 0.02,
   contrast: 0.04,
   altHueDelta: -30,
-  altSatScale: 1.41
+  altSatScale: 1.41,
+  motionAngleDeg: 0,
+  periodicAngleDeg: 0,
+  glowEnabled: false,
+  glowIntensity: 1,
+  glowHueShift: 180
 };
 
 // CloudBackdrop.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
+var clamp012 = (v) => Math.max(0, Math.min(1, v));
+var hexToHsl = (hex) => {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const n = parseInt(h, 16);
+  const r = n >> 16 & 255;
+  const g = n >> 8 & 255;
+  const b = n & 255;
+  const rr = r / 255;
+  const gg = g / 255;
+  const bb = b / 255;
+  const max = Math.max(rr, gg, bb);
+  const min = Math.min(rr, gg, bb);
+  let hue = 0;
+  const lightness = (max + min) / 2;
+  let saturation = 0;
+  if (max !== min) {
+    const d = max - min;
+    saturation = lightness > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case rr:
+        hue = (gg - bb) / d + (gg < bb ? 6 : 0);
+        break;
+      case gg:
+        hue = (bb - rr) / d + 2;
+        break;
+      default:
+        hue = (rr - gg) / d + 4;
+        break;
+    }
+    hue /= 6;
+  }
+  return { h: hue * 360, s: saturation, l: lightness };
+};
+var hslToHex = ({ h, s, l }) => {
+  const hueToRgb = (p, q, t) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  const hh = (h % 360 + 360) % 360 / 360;
+  let r;
+  let g;
+  let b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hueToRgb(p, q, hh + 1 / 3);
+    g = hueToRgb(p, q, hh);
+    b = hueToRgb(p, q, hh - 1 / 3);
+  }
+  const toHex = (x) => Math.round(clamp012(x) * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+var shiftHue = (hex, delta) => {
+  const hsl = hexToHsl(hex);
+  return hslToHex({ h: hsl.h + delta, s: hsl.s, l: hsl.l });
+};
+var sanitizeId = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "");
+var partialDefaults = cloudDefaults_default;
 var CloudMaker = ({
   width = cloudDefaults_default.width,
   height = cloudDefaults_default.height,
@@ -408,6 +512,9 @@ var CloudMaker = ({
   amplitudeJitter = cloudDefaults_default.amplitudeJitter,
   amplitudeJitterScale = cloudDefaults_default.amplitudeJitterScale,
   additiveBlending = cloudDefaults_default.additiveBlending,
+  backOpacity = cloudDefaults_default.backOpacity ?? 0.12,
+  frontOpacity = cloudDefaults_default.frontOpacity ?? 0.96,
+  opacityCurvePower = cloudDefaults_default.opacityCurvePower ?? 2.4,
   curveType = cloudDefaults_default.curveType,
   curveTension = cloudDefaults_default.curveTension,
   peakStability = cloudDefaults_default.peakStability,
@@ -415,6 +522,11 @@ var CloudMaker = ({
   peakNoisePower = cloudDefaults_default.peakNoisePower,
   peakHarmonicDamping = cloudDefaults_default.peakHarmonicDamping,
   useSharedBaseline = cloudDefaults_default.useSharedBaseline,
+  baseAmplitude = partialDefaults.baseAmplitude,
+  baseFrequency = partialDefaults.baseFrequency,
+  layerFrequencyStep = partialDefaults.layerFrequencyStep,
+  secondaryWaveFactor = partialDefaults.secondaryWaveFactor,
+  layerVerticalSpacing = partialDefaults.layerVerticalSpacing,
   morphStrength = cloudDefaults_default.morphStrength,
   morphPeriodSec = cloudDefaults_default.morphPeriodSec,
   amplitudeEnvelopeStrength = cloudDefaults_default.amplitudeEnvelopeStrength,
@@ -427,16 +539,108 @@ var CloudMaker = ({
   className,
   style,
   fit = "stretch",
-  background = false
+  background = false,
+  motionAngleDeg = cloudDefaults_default.motionAngleDeg ?? 0,
+  periodicAngleDeg = cloudDefaults_default.periodicAngleDeg ?? 0,
+  paused = false,
+  glowEnabled = cloudDefaults_default.glowEnabled ?? false,
+  glowIntensity = cloudDefaults_default.glowIntensity ?? 1,
+  glowHueShift = cloudDefaults_default.glowHueShift ?? 0
 }) => {
+  const glow = {
+    enabled: !!glowEnabled,
+    intensity: Math.max(0, glowIntensity),
+    hueShift: glowHueShift ?? 0
+  };
+  const blurFilterBaseId = (0, import_react.useId)();
+  const glowFilterBaseId = (0, import_react.useId)();
+  const blurFilterId = (0, import_react.useMemo)(() => `cloud-blur-${sanitizeId(blurFilterBaseId)}`, [blurFilterBaseId]);
+  const glowFilterId = (0, import_react.useMemo)(() => `cloud-glow-${sanitizeId(glowFilterBaseId)}`, [glowFilterBaseId]);
   const engine = (0, import_react.useMemo)(
-    () => createCloudEngine({ width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles }),
-    [width, height, layers, segments, baseColor, layerColors, layerOpacities, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles]
+    () => createCloudEngine({
+      width,
+      height,
+      layers,
+      segments,
+      baseColor,
+      layerColors,
+      layerOpacities,
+      seed,
+      blur,
+      waveForm,
+      noiseSmoothness,
+      amplitudeJitter,
+      amplitudeJitterScale,
+      backOpacity,
+      frontOpacity,
+      opacityCurvePower,
+      curveType,
+      curveTension,
+      peakStability,
+      peakNoiseDamping,
+      peakNoisePower,
+      peakHarmonicDamping,
+      useSharedBaseline,
+      morphStrength,
+      morphPeriodSec,
+      amplitudeEnvelopeStrength,
+      amplitudeEnvelopeCycles,
+      motionAngleDeg,
+      periodicAngleDeg,
+      ...baseAmplitude !== void 0 ? { baseAmplitude } : {},
+      ...baseFrequency !== void 0 ? { baseFrequency } : {},
+      ...layerFrequencyStep !== void 0 ? { layerFrequencyStep } : {},
+      ...secondaryWaveFactor !== void 0 ? { secondaryWaveFactor } : {},
+      ...layerVerticalSpacing !== void 0 ? { layerVerticalSpacing } : {}
+    }),
+    [
+      width,
+      height,
+      layers,
+      segments,
+      baseColor,
+      layerColors,
+      layerOpacities,
+      seed,
+      blur,
+      waveForm,
+      noiseSmoothness,
+      amplitudeJitter,
+      amplitudeJitterScale,
+      backOpacity,
+      frontOpacity,
+      opacityCurvePower,
+      curveType,
+      curveTension,
+      peakStability,
+      peakNoiseDamping,
+      peakNoisePower,
+      peakHarmonicDamping,
+      useSharedBaseline,
+      morphStrength,
+      morphPeriodSec,
+      amplitudeEnvelopeStrength,
+      amplitudeEnvelopeCycles,
+      motionAngleDeg,
+      periodicAngleDeg,
+      baseAmplitude,
+      baseFrequency,
+      layerFrequencyStep,
+      secondaryWaveFactor,
+      layerVerticalSpacing
+    ]
   );
   const initial = (0, import_react.useMemo)(() => engine.pathsAt(phase, morphT, cycleIndex), [engine, phase, morphT, cycleIndex]);
   const refs = (0, import_react.useRef)([]);
+  const glowRefs = (0, import_react.useRef)([]);
   (0, import_react.useEffect)(() => {
-    if (!animate) return;
+    if (!glow.enabled) {
+      glowRefs.current = [];
+    }
+  }, [glow.enabled]);
+  const shouldAnimate = animate && !paused;
+  (0, import_react.useEffect)(() => {
+    if (!shouldAnimate) return;
     if (typeof window === "undefined") return;
     let raf = 0;
     const t0 = performance.now();
@@ -444,17 +648,25 @@ var CloudMaker = ({
       const elapsedSec = (t - t0) / 1e3;
       const phase2 = speed * elapsedSec;
       const period = Math.max(1e-4, engine.config.morphPeriodSec);
-      const morphT2 = elapsedSec / period % 1;
+      const nextMorphT = elapsedSec / period % 1;
       const cycleIndex2 = seamlessLoop ? 0 : Math.floor(elapsedSec / period);
-      engine.pathsAt(phase2, morphT2, cycleIndex2).forEach((p, i) => refs.current[i]?.setAttribute("d", p.d));
+      engine.pathsAt(phase2, nextMorphT, cycleIndex2).forEach((p, i) => {
+        const fillPath = p.d;
+        refs.current[i]?.setAttribute("d", fillPath);
+        if (glow.enabled) {
+          glowRefs.current[i]?.setAttribute("d", fillPath);
+        }
+      });
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
     };
-  }, [engine, speed, animate, seamlessLoop]);
+  }, [engine, speed, phase, seamlessLoop, glow.enabled, shouldAnimate]);
   const preserve = fit === "stretch" ? "none" : fit === "slice" ? "xMidYMid slice" : "xMidYMid meet";
+  const glowGroupOpacity = glow.enabled ? clamp012(0.45 * glow.intensity) : 0;
+  const glowBlur = Math.max(engine.blur * 1.4, 12 * glow.intensity);
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
     "svg",
     {
@@ -468,8 +680,56 @@ var CloudMaker = ({
       "aria-hidden": true,
       children: [
         typeof background === "string" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: 0, y: 0, width: "100%", height: "100%", fill: background }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("filter", { id: "cloud-blur", x: "-20%", y: "-20%", width: "140%", height: "140%", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feGaussianBlur", { stdDeviation: engine.blur }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("g", { filter: "url(#cloud-blur)", style: { mixBlendMode: additiveBlending ? "screen" : "normal" }, children: initial.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("defs", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "filter",
+            {
+              id: blurFilterId,
+              filterUnits: "userSpaceOnUse",
+              x: -engine.width * 0.2,
+              y: -engine.height * 0.2,
+              width: engine.width * 1.4,
+              height: engine.height * 1.4,
+              children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feGaussianBlur", { stdDeviation: engine.blur })
+            }
+          ),
+          glow.enabled && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+            "filter",
+            {
+              id: glowFilterId,
+              filterUnits: "userSpaceOnUse",
+              x: -engine.width * 0.6,
+              y: -engine.height * 0.8,
+              width: engine.width * 2.2,
+              height: engine.height * 2.6,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feGaussianBlur", { in: "SourceGraphic", stdDeviation: glowBlur, result: "blur" }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feComponentTransfer", { in: "blur", result: "softGlow", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feFuncA", { type: "linear", slope: glowGroupOpacity }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMerge", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMergeNode", { in: "softGlow" }) })
+              ]
+            }
+          )
+        ] }),
+        glow.enabled && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "g",
+          {
+            filter: `url(#${glowFilterId})`,
+            style: { mixBlendMode: additiveBlending ? "screen" : "lighten" },
+            children: initial.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "path",
+              {
+                ref: (el) => {
+                  if (el) glowRefs.current[i] = el;
+                },
+                d: p.d,
+                fill: shiftHue(p.fill ?? baseColor, glow.hueShift),
+                fillOpacity: clamp012((layerOpacities?.[i] ?? p.opacity ?? 1) * glow.intensity)
+              },
+              `glow-${i}`
+            ))
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("g", { filter: `url(#${blurFilterId})`, style: { mixBlendMode: additiveBlending ? "screen" : "normal" }, children: initial.map((p, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "path",
           {
             ref: (el) => {
@@ -477,7 +737,7 @@ var CloudMaker = ({
             },
             d: p.d,
             fill: p.fill,
-            fillOpacity: layerOpacities?.[i] ?? (additiveBlending ? Math.max(0.06, (i + 1) / (engine.config.layers || initial.length) * 0.7) : p.opacity)
+            fillOpacity: layerOpacities?.[i] ?? p.opacity
           },
           i
         )) })
@@ -507,6 +767,9 @@ var presets = {
     noiseSmoothness: 0.45,
     amplitudeJitter: 0,
     amplitudeJitterScale: 0.25,
+    backOpacity: 0.12,
+    frontOpacity: 0.96,
+    opacityCurvePower: 2.4,
     curveType: "spline",
     curveTension: 0.85,
     peakStability: 1,

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import CloudBackdrop from './CloudBackdrop';
 import { CloudMaker } from 'cloud-engine';
 import Icon from './icons';
 import SettingsPanel from './settings/SettingsPanel';
@@ -189,7 +188,6 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [amplitudeEnvelopeStrength, setAmplitudeEnvelopeStrength] = useState(initial?.amplitudeEnvelopeStrength ?? defaults.amplitudeEnvelopeStrength ?? 0.36);
   const [amplitudeEnvelopeCycles, setAmplitudeEnvelopeCycles] = useState(initial?.amplitudeEnvelopeCycles ?? defaults.amplitudeEnvelopeCycles ?? 2);
   const [seamlessLoop, setSeamlessLoop] = useState(true);
-  const [usePackageEngine, setUsePackageEngine] = useState(false);
   const [solidBgEnabled, setSolidBgEnabled] = useState(true);
   const [solidBgHue, setSolidBgHue] = useState(222);
   const [solidBgSat, setSolidBgSat] = useState(0.65);
@@ -205,6 +203,8 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [layerSpacing, setLayerSpacing] = useState(16);
   const [sunsetMode, setSunsetMode] = useState(initial?.sunsetMode ?? defaults.sunsetMode ?? false);
   const [sunsetPeriodSec, setSunsetPeriodSec] = useState(initial?.sunsetPeriodSec ?? defaults.sunsetPeriodSec ?? 12);
+  const [motionAngleDeg, setMotionAngleDeg] = useState(defaults.motionAngleDeg ?? 0);
+  const [periodicAngleDeg, setPeriodicAngleDeg] = useState(defaults.periodicAngleDeg ?? 0);
   const [autoCyclePalettes, setAutoCyclePalettes] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(defaults.paletteIndex ?? 0);
   const [smoothTransitionT, setSmoothTransitionT] = useState(0);
@@ -218,9 +218,12 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [mounted, setMounted] = useState(false);
   // Background glow controls
-  const [backgroundGlowEnabled, setBackgroundGlowEnabled] = useState(true);
-  const [bgGlowIntensity, setBgGlowIntensity] = useState(1);
-  const [bgGlowHueShift, setBgGlowHueShift] = useState(0);
+  const [backgroundGlowEnabled, setBackgroundGlowEnabled] = useState(defaults.glowEnabled ?? true);
+  const [bgGlowIntensity, setBgGlowIntensity] = useState(defaults.glowIntensity ?? 1);
+  const [bgGlowHueShift, setBgGlowHueShift] = useState(defaults.glowHueShift ?? 0);
+  const [exportPreview, setExportPreview] = useState<string | null>(null);
+  const exportPreviewRef = useRef<HTMLTextAreaElement | null>(null);
+
 
   const resetPaletteAdjustments = React.useCallback(() => {
     setHueShift(0);
@@ -351,23 +354,38 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       setContrast(d.contrast);
       setAltHueDelta(d.altHueDelta);
       setAltSatScale(d.altSatScale);
+      setMotionAngleDeg(d.motionAngleDeg ?? 0);
+      setPeriodicAngleDeg(d.periodicAngleDeg ?? 0);
+      setBackgroundGlowEnabled(d.glowEnabled ?? defaults.glowEnabled ?? true);
+      setBgGlowIntensity(d.glowIntensity ?? defaults.glowIntensity ?? 1);
+      setBgGlowHueShift(d.glowHueShift ?? defaults.glowHueShift ?? 0);
      })();
   }, [initial]);
 
   const shuffle = () => { setSeed(Math.floor(Math.random() * 1e9)); };
 
   const exportCloudConfig = React.useCallback(() => {
-    // Get the current effective parameters that would be passed to CloudMaker
+    // Mirror the effective props passed to <CloudMaker /> so the exported snippet matches the UI.
+    const themedLayers = layerTheme;
     const effectiveBaseColor = sunsetMode ? '#ffffff' : baseColor;
-    const layerTheme = sunsetMode ? getThemePalette(paletteNames[paletteIndex] || 'sunset', layers) : null;
-    const effectiveLayerColors = sunsetMode ? layerTheme?.colors : undefined;
-    const effectiveLayerOpacities = sunsetMode ? layerTheme?.opacities : undefined;
+    const effectiveLayerColors = sunsetMode ? themedLayers?.colors : undefined;
+    const effectiveLayerOpacities = sunsetMode ? themedLayers?.opacities : undefined;
+
+    const effectiveCurveType = staticPeaks ? 'spline' : curveType;
+    const effectiveCurveTension = staticPeaks ? 0.8 : curveTension;
+    const effectiveNoiseSmoothness = staticPeaks ? Math.max(noiseSmoothness, 0.4) : noiseSmoothness;
+    const effectiveAmplitudeJitter = staticPeaks ? 0 : amplitudeJitter;
+    const effectivePeakStability = staticPeaks ? 1 : peakStability;
+        const effectivePeakNoiseDamping = staticPeaks ? 1 : peakNoiseDamping;
+        const effectivePeakNoisePower = staticPeaks ? Math.max(peakNoisePower, 4) : peakNoisePower;
+        const effectivePeakHarmonicDamping = staticPeaks ? 1 : peakHarmonicDamping;
+        const effectiveLayerSpacing = Math.max(12, Math.min(24, layerSpacing));
 
     // Calculate effective roundness values (using default since UI controls removed)
     const effRound = 0.3;
     const effRoundPower = Math.max(1, Math.min(4, 3.5 - 2.0 * effRound));
 
-    const config = {
+    const cloudProps = {
       width,
       height,
       layers,
@@ -379,16 +397,16 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       seed,
       blur,
       waveForm,
-      noiseSmoothness,
-      amplitudeJitter,
+      noiseSmoothness: effectiveNoiseSmoothness,
+      amplitudeJitter: effectiveAmplitudeJitter,
       amplitudeJitterScale,
       additiveBlending,
-      curveType,
-      curveTension,
-      peakStability,
-      peakNoiseDamping,
-      peakNoisePower,
-      peakHarmonicDamping,
+      curveType: effectiveCurveType,
+      curveTension: effectiveCurveTension,
+      peakStability: effectivePeakStability,
+      peakNoiseDamping: effectivePeakNoiseDamping,
+      peakNoisePower: effectivePeakNoisePower,
+      peakHarmonicDamping: effectivePeakHarmonicDamping,
       useSharedBaseline,
       morphStrength,
       morphPeriodSec,
@@ -396,14 +414,23 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       amplitudeEnvelopeCycles,
       peakRoundness: effRound,
       peakRoundnessPower: effRoundPower,
-      seamlessLoop: true,
-      animate: true,
-      background: solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false,
+      seamlessLoop,
+      animate: !paused,
+      background: false as const,
       fit: 'stretch' as const,
+      motionAngleDeg,
+      periodicAngleDeg,
+      baseAmplitude: topologyAmplitude,
+      baseFrequency: topologyFrequency,
+      layerFrequencyStep: topologyFreqStep,
+      secondaryWaveFactor: topologySecondary,
+      layerVerticalSpacing: effectiveLayerSpacing,
+      glowEnabled: backgroundGlowEnabled,
+      glowIntensity: bgGlowIntensity,
+      glowHueShift: bgGlowHueShift,
     };
 
-    // Create a formatted JSX snippet
-    const propsString = Object.entries(config)
+    const propsString = Object.entries(cloudProps)
       .map(([key, value]) => {
         if (value === undefined) return null;
         if (typeof value === 'string') return `${key}="${value}"`;
@@ -418,22 +445,59 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         style={{ width: '100%', height: '100%' }}
       />`;
 
-    // Copy to clipboard and show alert
-    navigator.clipboard.writeText(jsxSnippet).then(() => {
-      alert('CloudMaker configuration copied to clipboard!\n\n' + jsxSnippet);
-    }).catch(() => {
-      // Fallback: show in console and alert
-      console.log('CloudMaker Configuration:');
-      console.log(jsxSnippet);
-      alert('Configuration logged to console. Copy the JSX snippet from there.');
-    });
+    const copySupported = typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function';
+
+    if (copySupported) {
+      navigator.clipboard!.writeText(jsxSnippet).then(() => {
+        alert('CloudMaker configuration copied to clipboard!\n\n' + jsxSnippet);
+      }).catch(() => {
+        setExportPreview(jsxSnippet);
+      });
+      return;
+    }
+
+    // Fallback when Clipboard API is not available (e.g., insecure context).
+    setExportPreview(jsxSnippet);
   }, [
     width, height, layers, segments, baseColor, speed, seed, blur, waveForm,
     noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension,
     peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline,
     morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles,
-    sunsetMode, paletteIndex, solidBgEnabled, solidBgHue, solidBgSat, solidBgLight
+    sunsetMode, layerTheme, staticPeaks, paused, seamlessLoop,
+    motionAngleDeg, periodicAngleDeg,
+    topologyAmplitude, topologyFrequency, topologyFreqStep, topologySecondary, layerSpacing,
+    backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift
   ]);
+
+  const copyPreviewToClipboard = React.useCallback(() => {
+    if (!exportPreview) return;
+    if (typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function') {
+      navigator.clipboard.writeText(exportPreview).then(() => {
+        alert('CloudMaker configuration copied to clipboard!');
+        setExportPreview(null);
+      }).catch(() => {
+        alert('Clipboard access is blocked. Select the text in the panel and copy manually.');
+      });
+      return;
+    }
+    alert('Clipboard unavailable. Select the text in the panel and copy manually.');
+  }, [exportPreview]);
+
+  React.useEffect(() => {
+    if (!exportPreview) return;
+    const node = exportPreviewRef.current;
+    if (!node) return;
+    // Delay selection until after modal renders
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(() => {
+        node.focus();
+        node.select();
+      });
+    } else {
+      node.focus();
+      node.select();
+    }
+  }, [exportPreview]);
 
   const handleSaveTsx = React.useCallback(async () => {
     const defaultPaletteColors: Record<string, string[]> = {};
@@ -449,10 +513,14 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
       peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec,
       amplitudeEnvelopeStrength, amplitudeEnvelopeCycles,
       staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation,
-      lightness, contrast, altHueDelta, altSatScale, defaultPaletteColors,
+      lightness, contrast, altHueDelta, altSatScale, motionAngleDeg, periodicAngleDeg,
+      glowEnabled: backgroundGlowEnabled,
+      glowIntensity: bgGlowIntensity,
+      glowHueShift: bgGlowHueShift,
+      defaultPaletteColors,
     });
   }, [
-    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale
+    width, height, layers, segments, baseColor, speed, seed, blur, waveForm, noiseSmoothness, amplitudeJitter, amplitudeJitterScale, additiveBlending, curveType, curveTension, peakStability, peakNoiseDamping, peakNoisePower, peakHarmonicDamping, useSharedBaseline, morphStrength, morphPeriodSec, amplitudeEnvelopeStrength, amplitudeEnvelopeCycles, staticPeaks, sunsetMode, sunsetPeriodSec, paletteIndex, hueShift, saturation, lightness, contrast, altHueDelta, altSatScale, motionAngleDeg, periodicAngleDeg, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift
   ]);
 
   // Sunset palette auto-cycling with smooth transitions
@@ -526,9 +594,10 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
   }, [height, sunsetMode, themeForBackground, backgroundGlowEnabled, bgGlowIntensity, bgGlowHueShift]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '1fr auto 1fr', minHeight: '100vh', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div ref={hostRef} style={containerStyle} className={className}>
+    <>
+      <div style={{ display: 'grid', gridTemplateRows: '1fr auto 1fr', minHeight: '100vh', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div ref={hostRef} style={containerStyle} className={className}>
       {/* Compute effective parameters if static peaks mode is enabled; also handle color palettes */}
       {(() => {
         const p = layerTheme;
@@ -547,110 +616,80 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
         const effectivePeakHarmonicDamping = staticPeaks ? 1 : peakHarmonicDamping;
 
         return cloudsEnabled && mounted ? (
-          usePackageEngine ? (
-            <CloudMaker
-              key={`pkg-${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
-              width={width}
-              height={height}
-              layers={layers}
-              segments={segments}
-              baseColor={effectiveBaseColor}
-              {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
-              {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
-              speed={speed}
-              animate={!paused}
-              seed={seed}
-              blur={blur}
-              waveForm={waveForm}
-              noiseSmoothness={effectiveNoiseSmoothness}
-              amplitudeJitter={effectiveAmplitudeJitter}
-              amplitudeJitterScale={amplitudeJitterScale}
-              additiveBlending={additiveBlending}
-              curveType={effectiveCurveType}
-              curveTension={effectiveCurveTension}
-              peakStability={effectivePeakStability}
-              peakNoiseDamping={effectivePeakNoiseDamping}
-              peakNoisePower={effectivePeakNoisePower}
-              peakHarmonicDamping={effectivePeakHarmonicDamping}
-              useSharedBaseline={useSharedBaseline}
-              morphStrength={morphStrength}
-              morphPeriodSec={morphPeriodSec}
-              amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
-              amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
-              seamlessLoop={seamlessLoop}
-              background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
-            />
-          ) : (
-            <CloudBackdrop
-              key={`local-${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
-              width={width}
-              height={height}
-              layers={layers}
-              segments={segments}
-              baseColor={effectiveBaseColor}
-              {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
-              {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
-              speed={paused ? 0 : speed}
-              paused={paused}
-              seed={seed}
-              blur={blur}
-              waveForm={waveForm}
-              noiseSmoothness={effectiveNoiseSmoothness}
-              amplitudeJitter={effectiveAmplitudeJitter}
-              amplitudeJitterScale={amplitudeJitterScale}
-              additiveBlending={additiveBlending}
-              curveType={effectiveCurveType}
-              curveTension={effectiveCurveTension}
-              peakStability={effectivePeakStability}
-              peakNoiseDamping={effectivePeakNoiseDamping}
-              peakNoisePower={effectivePeakNoisePower}
-              peakHarmonicDamping={effectivePeakHarmonicDamping}
-              useSharedBaseline={useSharedBaseline}
-              morphStrength={morphStrength}
-              morphPeriodSec={morphPeriodSec}
-              amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
-              amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
-              seamlessLoop={seamlessLoop}
-              background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
-              baseAmplitude={topologyAmplitude}
-              baseFrequency={topologyFrequency}
-              layerFrequencyStep={topologyFreqStep}
-              secondaryWaveFactor={topologySecondary}
-              layerVerticalSpacing={effLayerSpacing}
-            />
-          )
+          <CloudMaker
+            key={`cloud-${sunsetMode ? 'sun' : 'base'}-${autoCyclePalettes ? 'cycling' : paletteIndex}-${layers}-${baseColor}-${seed}`}
+            width={width}
+            height={height}
+            layers={layers}
+            segments={segments}
+            baseColor={effectiveBaseColor}
+            {...(effectiveLayerColors ? { layerColors: effectiveLayerColors } : {})}
+            {...(effectiveLayerOpacities ? { layerOpacities: effectiveLayerOpacities } : {})}
+            speed={speed}
+            paused={paused}
+            seed={seed}
+            blur={blur}
+            waveForm={waveForm}
+            noiseSmoothness={effectiveNoiseSmoothness}
+            amplitudeJitter={effectiveAmplitudeJitter}
+            amplitudeJitterScale={amplitudeJitterScale}
+            additiveBlending={additiveBlending}
+            curveType={effectiveCurveType}
+            curveTension={effectiveCurveTension}
+            peakStability={effectivePeakStability}
+            peakNoiseDamping={effectivePeakNoiseDamping}
+            peakNoisePower={effectivePeakNoisePower}
+            peakHarmonicDamping={effectivePeakHarmonicDamping}
+            useSharedBaseline={useSharedBaseline}
+            morphStrength={morphStrength}
+            morphPeriodSec={morphPeriodSec}
+            amplitudeEnvelopeStrength={amplitudeEnvelopeStrength}
+            amplitudeEnvelopeCycles={amplitudeEnvelopeCycles}
+            seamlessLoop={seamlessLoop}
+            motionAngleDeg={motionAngleDeg}
+            periodicAngleDeg={periodicAngleDeg}
+            background={solidBgEnabled ? `hsl(${solidBgHue}deg ${Math.round(solidBgSat*100)}% ${Math.round(solidBgLight*100)}%)` : false}
+            baseAmplitude={topologyAmplitude}
+            baseFrequency={topologyFrequency}
+            layerFrequencyStep={topologyFreqStep}
+            secondaryWaveFactor={topologySecondary}
+            layerVerticalSpacing={effLayerSpacing}
+            glowEnabled={backgroundGlowEnabled}
+            glowIntensity={bgGlowIntensity}
+            glowHueShift={bgGlowHueShift}
+          />
         ) : (<div style={{ width: '100%', height }} />);
       })()}
 
-      </div>
-      </div>
+          </div>
+        </div>
 
-      <div />
+        <div />
 
-      {controlsVisible && (
-      <div style={{ ...panelStyle, height, width: '85vw', maxWidth: '1000px', margin: '0 auto', background: sunsetMode && paletteNames[paletteIndex] ? 'rgba(12,16,28,.6)' : panelStyle.background }}>
-        {(() => {
-          const paletteNameCurrent = paletteNames[paletteIndex % paletteNames.length] || 'sunset';
-          const adjustmentsNeutral = hueShift === 0 && saturation === 1 && lightness === 0 && contrast === 0 && altHueDelta === 0 && altSatScale === 1;
-          const curatedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers) : null;
-          const adjustedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
-            hueShiftDeg: hueShift,
-            saturationScale: saturation,
-            lightnessShift: lightness,
-            contrast,
-            alternateLayerHueDelta: altHueDelta,
-            alternateLayerSaturationScale: altSatScale,
-          }) : null;
-           const sections: SectionSchema[] = [
-            { id: 'key', title: 'Key Controls', order: 1 },
-            { id: 'appearance', title: 'Appearance', order: 2 },
-            { id: 'motion', title: 'Motion & Shape', order: 3 },
-            { id: 'compositing', title: 'Compositing & Baseline', order: 4 },
-              { id: 'variation', title: 'Variation', order: 5 },
-              { id: 'palette', title: 'Palette Adjustments', order: 6 },
-              { id: 'background', title: 'Background', order: 7 },
-          ];
-           const controls: ControlSchema[] = [
+        {controlsVisible && (
+          <div style={{ ...panelStyle, height, width: '85vw', maxWidth: '1000px', margin: '0 auto', background: sunsetMode && paletteNames[paletteIndex] ? 'rgba(12,16,28,.6)' : panelStyle.background }}>
+            {(() => {
+              const paletteNameCurrent = paletteNames[paletteIndex % paletteNames.length] || 'sunset';
+              const adjustmentsNeutral = hueShift === 0 && saturation === 1 && lightness === 0 && contrast === 0 && altHueDelta === 0 && altSatScale === 1;
+              const curatedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers) : null;
+              const adjustedTheme = sunsetMode ? getThemePalette(paletteNameCurrent, layers, { reverse: false }, {
+                hueShiftDeg: hueShift,
+                saturationScale: saturation,
+                lightnessShift: lightness,
+                contrast,
+                alternateLayerHueDelta: altHueDelta,
+                alternateLayerSaturationScale: altSatScale,
+              }) : null;
+              const sections: SectionSchema[] = [
+                { id: 'key', title: 'Key Controls', order: 1 },
+                { id: 'appearance', title: 'Appearance', order: 2 },
+                { id: 'motion', title: 'Motion & Shape', order: 3 },
+                { id: 'compositing', title: 'Compositing & Baseline', order: 4 },
+                { id: 'variation', title: 'Variation', order: 5 },
+                { id: 'palette', title: 'Palette Adjustments', order: 6 },
+                { id: 'background', title: 'Background', order: 7 },
+              ];
+              const controls: ControlSchema[] = [
             { id: 'actions-top', label: 'Actions', sectionId: 'key', order: 0, type: 'buttons', fullRow: true, render: () => (
               <Row label="Actions">
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -717,15 +756,12 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
                     setMorphStrength(0); setMorphPeriodSec(18);
                     setAmplitudeEnvelopeStrength(0.7); setAmplitudeEnvelopeCycles(10);
                     setSunsetMode(false); setPaletteIndex(0);
+                    setBackgroundGlowEnabled(defaults.glowEnabled ?? true);
+                    setBgGlowIntensity(defaults.glowIntensity ?? 1);
+                    setBgGlowHueShift(defaults.glowHueShift ?? 0);
                   }}>reset</button>
                   <button style={btn} onClick={handleSaveTsx}>save</button>
                   <button style={btn} onClick={exportCloudConfig}>export config</button>
-                  {isDev && (
-                    <button
-                      style={btn}
-                      onClick={() => { setUsePackageEngine(v => !v); }}
-                    >engine: {usePackageEngine ? 'package' : 'local'}</button>
-                  )}
                 </div>
               </Row>
             ) },
@@ -759,6 +795,8 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'waveform', label: 'Wave form', sectionId: 'motion', order: 1, type: 'select', render: () => <Row label="Wave form" right={<select value={waveForm} onChange={e => { setWaveForm(e.target.value as 'sin' | 'cos' | 'sincos' | 'round'); }} style={{ background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,.25)', borderRadius: 8, padding: '6px 8px' }}><option value="sincos">sin + harmonic</option><option value="sin">sin</option><option value="cos">cos</option><option value="round">rounded cos</option></select>} /> },
             // removed noise smoothness, amplitude jitter, and jitter scale per UX request
             { id: 'blend', label: 'Additive blending', sectionId: 'motion', order: 5, type: 'toggle', render: () => <Row label="Additive blending" right={<Toggle checked={additiveBlending} onChange={setAdditiveBlending} />} /> },
+            { id: 'angle', label: 'Motion angle (deg)', sectionId: 'motion', order: 6, type: 'slider', fullRow: true, render: () => <Row label="Motion angle (deg)"><Range min={-60} max={60} step={1} value={motionAngleDeg} onChange={setMotionAngleDeg} /></Row> },
+            { id: 'periodic-angle', label: 'Periodic angle (deg)', sectionId: 'motion', order: 7, type: 'slider', fullRow: true, render: () => <Row label="Periodic angle (deg)"><Range min={-60} max={60} step={1} value={periodicAngleDeg} onChange={setPeriodicAngleDeg} /></Row> },
             // removed Curve type per UX request
             // removed Curve tension per UX request
             // removed Peak stability per UX request
@@ -840,16 +878,109 @@ const CloudBackdropReview: React.FC<{ className?: string; initial?: Init }> = ({
             { id: 'bg-intensity', label: 'Glow intensity', sectionId: 'background', order: 2, type: 'slider', colSpan: 2, render: () => <Row label="Glow intensity"><Range min={0} max={2} step={0.01} value={bgGlowIntensity} onChange={setBgGlowIntensity} /></Row> },
             { id: 'bg-hue', label: 'Glow hue shift', sectionId: 'background', order: 3, type: 'slider', colSpan: 2, render: () => <Row label="Glow hue shift"><Range min={-180} max={180} step={1} value={bgGlowHueShift} onChange={setBgGlowHueShift} /></Row> },
           ];
-          return <SettingsPanel sections={sections} controls={controls} />;
-        })()}
+              return <SettingsPanel sections={sections} controls={controls} />;
+            })()}
+        </div>
+        )}
+        {!controlsVisible && (
+          <div style={{ gridRow: 3, textAlign: 'center', marginTop: 8 }}>
+            <button onClick={() => { setControlsVisible(true); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.06)', color: 'inherit' }}>menu</button>
+          </div>
+        )}
       </div>
-      )}
-      {!controlsVisible && (
-        <div style={{ gridRow: 3, textAlign: 'center', marginTop: 8 }}>
-          <button onClick={() => { setControlsVisible(true); }} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.06)', color: 'inherit' }}>menu</button>
+
+      {exportPreview && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5,8,15,0.72)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 32,
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              width: 'min(900px, 90vw)',
+              maxHeight: '84vh',
+              background: 'rgba(12,16,28,0.96)',
+              borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.15)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+              padding: 24,
+              color: '#fff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 14, letterSpacing: 1.4, textTransform: 'uppercase', opacity: 0.7 }}>CloudMaker export</div>
+                <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>Copy configuration</div>
+              </div>
+              <button
+                style={{
+                  ...btn,
+                  padding: '6px 10px',
+                  border: '1px solid rgba(255,255,255,0.35)',
+                  background: 'rgba(255,255,255,0.08)'
+                }}
+                onClick={() => { setExportPreview(null); }}
+              >close</button>
+            </div>
+            <textarea
+              ref={exportPreviewRef}
+              readOnly
+              value={exportPreview}
+              style={{
+                flex: '1 1 auto',
+                width: '100%',
+                minHeight: '40vh',
+                maxHeight: '60vh',
+                background: 'rgba(4,6,14,0.9)',
+                color: '#f5f8ff',
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.18)',
+                padding: 16,
+                fontFamily: 'SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+                fontSize: 12,
+                lineHeight: 1.6,
+                resize: 'vertical',
+                overflow: 'auto'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, opacity: 0.65 }}>Tip: If the copy button fails, press ⌘/Ctrl+A then ⌘/Ctrl+C.</span>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  style={{
+                    ...btn,
+                    padding: '10px 18px',
+                    border: '1px solid rgba(255,255,255,0.45)',
+                    background: 'rgba(255,255,255,0.14)',
+                    fontWeight: 600
+                  }}
+                  onClick={copyPreviewToClipboard}
+                >copy to clipboard</button>
+                <button
+                  style={{
+                    ...btn,
+                    padding: '10px 18px'
+                  }}
+                  onClick={() => { setExportPreview(null); }}
+                >close</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

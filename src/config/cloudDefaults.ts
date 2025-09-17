@@ -1,3 +1,5 @@
+import { cloudDefaults as packageCloudDefaults } from 'cloud-engine';
+
 export type CloudDefaults = {
   width: number;
   height: number;
@@ -12,6 +14,9 @@ export type CloudDefaults = {
   amplitudeJitter: number;
   amplitudeJitterScale: number;
   additiveBlending: boolean;
+  backOpacity: number;
+  frontOpacity: number;
+  opacityCurvePower: number;
   curveType: 'linear' | 'spline';
   curveTension: number;
   peakStability: number;
@@ -19,6 +24,8 @@ export type CloudDefaults = {
   peakNoisePower: number;
   peakHarmonicDamping: number;
   useSharedBaseline: boolean;
+  peakRoundness: number;
+  peakRoundnessPower: number;
   morphStrength: number;
   morphPeriodSec: number;
   amplitudeEnvelopeStrength: number;
@@ -33,47 +40,21 @@ export type CloudDefaults = {
   contrast: number;
   altHueDelta: number;
   altSatScale: number;
+  motionAngleDeg: number;
+  periodicAngleDeg: number;
+  glowEnabled: boolean;
+  glowIntensity: number;
+  glowHueShift: number;
   defaultPaletteColors?: Record<string, string[]>;
 };
 
 const STORAGE_KEY = 'cloud-defaults-v1';
 
-export const defaultCloudDefaults: CloudDefaults = {
-  width: 1200,
-  height: 380,
-  layers: 7,
-  segments: 450,
-  baseColor: '#ffffff',
-  speed: 60,
-  seed: 1337,
-  blur: 2.2,
-  waveForm: 'round',
-  noiseSmoothness: 0.45,
-  amplitudeJitter: 0,
-  amplitudeJitterScale: 0.25,
-  additiveBlending: false,
-  curveType: 'spline',
-  curveTension: 0.85,
-  peakStability: 1.0,
-  peakNoiseDamping: 1.0,
-  peakNoisePower: 4,
-  peakHarmonicDamping: 1.0,
-  useSharedBaseline: true,
-  morphStrength: 0,
-  morphPeriodSec: 18,
-  amplitudeEnvelopeStrength: 0.7,
-  amplitudeEnvelopeCycles: 10,
-  staticPeaks: true,
-  sunsetMode: false,
-  sunsetPeriodSec: 12,
-  paletteIndex: 0,
-  hueShift: 0,
-  saturation: 1,
-  lightness: 0,
-  contrast: 0,
-  altHueDelta: 0,
-  altSatScale: 1,
-};
+const canonicalDefaults = packageCloudDefaults as CloudDefaults;
+
+export const defaultCloudDefaults: CloudDefaults = normalizeDefaults({
+  ...canonicalDefaults,
+});
 
 export function loadCloudDefaults(): CloudDefaults {
   if (typeof window === 'undefined') return defaultCloudDefaults;
@@ -141,6 +122,11 @@ function normalizeDefaults(d: CloudDefaults): CloudDefaults {
   const contrast = Math.round(clamp(d.contrast ?? 0, -1, 1) * 100) / 100;
   const altHueDelta = Math.round(clamp(d.altHueDelta ?? 0, -90, 90));
   const altSatScale = Math.round(clamp(d.altSatScale ?? 1, 0.5, 1.5) * 100) / 100;
+  const motionAngleDeg = Math.round(clamp(d.motionAngleDeg ?? 0, -80, 80));
+  const periodicAngleDeg = Math.round(clamp(d.periodicAngleDeg ?? 0, -80, 80));
+  const glowIntensity = Math.round(clamp(d.glowIntensity ?? 1, 0, 2) * 100) / 100;
+  const glowHueShift = Math.round(clamp(d.glowHueShift ?? 0, -360, 360));
+  const glowEnabled = !!d.glowEnabled;
 
   return {
     ...d,
@@ -150,7 +136,10 @@ function normalizeDefaults(d: CloudDefaults): CloudDefaults {
     contrast,
     altHueDelta,
     altSatScale,
+    motionAngleDeg,
+    periodicAngleDeg,
+    glowEnabled,
+    glowIntensity,
+    glowHueShift,
   };
 }
-
-

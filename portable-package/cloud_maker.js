@@ -15,19 +15,21 @@ const mixToWhite = (hex, t) => {
 };
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const roundOpacity = v => Math.round(clamp01(v) * 1000) / 1000;
-const computeOpacityRamp = (count) => {
+const computeOpacityRamp = (count, opts = {}) => {
   const n = Math.max(1, count | 0);
-  if (n === 1) return [roundOpacity(0.85)];
-  const front = clamp01(0.706 + 2.05 / n - 3.864 / (n * n));
-  const back = clamp01(0.0375 + 3.5175 / n - 4.41 / (n * n));
-  const start = Math.max(front, back);
-  const end = back;
-  const curve = 0.7 + Math.min(1.4, n / 7);
+  const front = clamp01(Number.isFinite(opts.frontOpacity) ? opts.frontOpacity : 0.96);
+  const back = clamp01(Number.isFinite(opts.backOpacity) ? opts.backOpacity : 0.12);
+  const powerRaw = Number.isFinite(opts.opacityCurvePower) ? opts.opacityCurvePower : 2.4;
+  const power = Math.max(1e-3, powerRaw);
+  if (n === 1) {
+    return [roundOpacity(front)];
+  }
+  const delta = front - back;
   const result = new Array(n);
   for (let i = 0; i < n; i++) {
-    const t = n === 1 ? 0 : i / (n - 1);
-    const eased = 1 - Math.pow(t, curve); // keep front layers lighter when count grows
-    const opacity = end + (start - end) * eased;
+    const t = n === 1 ? 1 : i / (n - 1);
+    const eased = Math.pow(t, power);
+    const opacity = back + delta * eased;
     result[i] = roundOpacity(opacity);
   }
   return result;
@@ -41,6 +43,7 @@ export function createCloudEngine(opts = {}) {
     layerAmplitudeStep: 2.6, layerFrequencyStep: 0.004, layerRandomStep: 1.2,
     layerVerticalSpacing: 16, secondaryWaveFactor: 0.45,
     baseColor: '#ffffff', layerColors: [], layerOpacities: undefined, blur: 2.2, seed: 1337,
+    backOpacity: 0.12, frontOpacity: 0.96, opacityCurvePower: 2.4,
     // New physicality controls
     waveForm: 'round',             // 'sin' | 'cos' | 'sincos' | 'round'
     noiseSmoothness: 0.45,         // 0..1 moving-average smoothing on noise
@@ -61,6 +64,10 @@ export function createCloudEngine(opts = {}) {
     peakRoundness: 0.3,            // 0..1 extra local smoothing at crests/troughs
     peakRoundnessPower: 2,         // >=1 tightness of peak-local smoothing
     amplitudeLayerCycleVariance: 0.2, // 0..1 per-layer amplitude scale variance per cycle
+    // Motion path orientation (degrees). 0 = horizontal (default). +tilts upward, -tilts downward.
+    motionAngleDeg: 0,
+    // Phase sampling rotation (degrees). 0 = standard sampling, rotates phase coordinate system
+    periodicAngleDeg: 0,
     ...opts
   };
 
@@ -133,7 +140,12 @@ export function createCloudEngine(opts = {}) {
     cachedCycle = cycleIndex;
   };
   const colorAt = i => (o.layerColors && o.layerColors.length ? o.layerColors[Math.min(i, o.layerColors.length - 1)] : mixToWhite(o.baseColor, Math.min(0.08 * i, 0.6)));
-  const defaultOpacityRamp = computeOpacityRamp(o.layers);
+  const defaultOpacityRamp = computeOpacityRamp(o.layers, {
+    backOpacity: o.backOpacity,
+    frontOpacity: o.frontOpacity,
+    opacityCurvePower: o.opacityCurvePower
+  });
+  o.opacityRamp = defaultOpacityRamp;
   const opacityAt = (i) => {
     if (Array.isArray(o.layerOpacities) && o.layerOpacities.length) {
       const idx = Math.min(i, o.layerOpacities.length - 1);
@@ -174,107 +186,139 @@ export function createCloudEngine(opts = {}) {
     noise: cachedFields.noisesA[i]
   });
 
-  // morphT is in [0,1) representing position in morph cycle
   const pathFor = (i, phase, morphT = 0) => {
     const p = params(i);
-    const fillBase = o.useSharedBaseline ? o.height : p.baseLine; // shared closure baseline to prevent staggered bottoms
-    // Collect points across the curve
+    const fillBase = o.useSharedBaseline ? o.height : p.baseLine;
     const pts = [];
+
+    // Motion axis basis (for baseline slanting)
+    const motionTheta = ((o.motionAngleDeg || 0) * Math.PI) / 180;
+    const motionCosT = Math.cos(motionTheta);
+    const motionSinT = Math.sin(motionTheta);
+    const motionInvCos = 1 / Math.max(1e-3, Math.abs(motionCosT));
+
+    // Periodic axis basis (for phase sampling rotation)
+    const periodicTheta = ((o.periodicAngleDeg || 0) * Math.PI) / 180;
+    const periodicCosT = Math.cos(periodicTheta);
+    const periodicSinT = Math.sin(periodicTheta);
+    const periodicInvCos = 1 / Math.max(1e-3, Math.abs(periodicCosT));
+
+    // Distance along motion axis (for baseline positioning)
+    const tMotionOfX = (x) => Math.abs(x - center) * motionInvCos;
+
+    // Distance along periodic axis (for phase sampling)
+    const tPeriodicOf = (x, y) => Math.abs(x - center) * periodicCosT + (y - p.baseLine) * periodicSinT;
+    const tPeriodicNormOf = (x, y) => (tPeriodicOf(x, y) - phase) * periodicInvCos;
+
+    // Helpers
+    const m = Math.max(0, Math.min(1, o.morphStrength)) * (0.5 - 0.5 * Math.cos(2 * Math.PI * morphT));
+    const envBase = cachedFields.envelopePhases[i] + i * 0.37;
+    const segPerW = o.segments / Math.max(1, o.width);
+
+    const waveAt = (arg) => {
+      if (o.waveForm === 'sin') return Math.sin(arg);
+      if (o.waveForm === 'cos') return Math.cos(arg);
+      if (o.waveForm === 'round') { const c = Math.cos(arg); return c / (0.4 + 0.4 * Math.abs(c)); }
+      const base = Math.sin(arg);
+      const harmonic = Math.sin(2 * arg + p.phi * 0.3);
+      const peakP = Math.pow(Math.abs(Math.cos(arg)), Math.max(1, o.peakNoisePower));
+      const harmScale = 1 - o.peakHarmonicDamping * (1 - peakP);
+      return base + o.secondaryWaveFactor * harmScale * harmonic;
+    };
+
     for (let k = 0; k <= o.segments; k++) {
       const x = (k / o.segments) * o.width;
-      const dist = Math.abs(x - center);
-      const baseArg = p.freq * (dist - phase) + p.phi;
-      let wave = 0;
-      if (o.waveForm === 'sin') {
-        wave = Math.sin(baseArg);
-      } else if (o.waveForm === 'cos') {
-        wave = Math.cos(baseArg);
-      } else if (o.waveForm === 'round') {
-        const c = Math.cos(baseArg);
-        wave = c / (0.4 + 0.4 * Math.abs(c));
-      } else {
-        const base = Math.sin(baseArg);
-        const harmonic = Math.sin(2 * baseArg + p.phi * 0.3);
-        const peakProximity = Math.pow(Math.abs(Math.cos(baseArg)), Math.max(1, o.peakNoisePower));
-        const harmonicScale = 1 - o.peakHarmonicDamping * (1 - peakProximity);
-        wave = base + o.secondaryWaveFactor * harmonicScale * harmonic;
+
+      // Motion axis for baseline positioning
+      const tMotion = tMotionOfX(x);
+      const yBase = p.baseLine + tMotion * motionSinT;
+
+      // Periodic axis for phase sampling (rotated coordinate system)
+      let sn = tPeriodicNormOf(x, yBase);
+      let arg = p.freq * sn + p.phi;
+
+      // Iterative refinement to account for y dependence
+      for (let iter = 0; iter < 3; iter++) {
+        const peakP = Math.pow(Math.abs(Math.cos(arg)), Math.max(1, o.peakNoisePower));
+        const noiseScale = 1 - o.peakNoiseDamping * (1 - peakP);
+
+        const ridx = sn * segPerW;
+        const stableNoise = sampleMorph(cachedFields.noisesA[i], cachedFields.noisesB[i], ridx, m);
+        const stableAmpMod = sampleMorph(cachedFields.ampModsA[i], cachedFields.ampModsB[i], ridx, m);
+
+        const mixedNoise = ((1 - o.peakStability) * (p.noise[k] || 0) + o.peakStability * stableNoise) * noiseScale;
+        const mixedAmpMod = ((1 - o.peakStability) * (cachedFields.ampModsA[i][k] || 0) + o.peakStability * stableAmpMod) * noiseScale;
+
+        const envStrength = o.amplitudeEnvelopeStrength * (0.9 + 0.2 * ((i * 16807) % 11) / 10);
+        const env = 1 + envStrength * Math.sin(2 * Math.PI * o.amplitudeEnvelopeCycles * sn / Math.max(1, o.width) + envBase);
+
+        const baseAmp = p.amp * (cachedFields.ampLayerScale[i] || 1) * env;
+        const ampMult = 1 + o.amplitudeJitter * mixedAmpMod;
+        const wave = waveAt(arg);
+        const w = baseAmp * ampMult * wave + mixedNoise * p.rndF;
+
+        // Update y and recompute phase coordinate
+        const yNew = yBase - w;
+        sn = tPeriodicNormOf(x, yNew);
+        arg = p.freq * sn + p.phi;
+
+        if (iter === 2) {
+          pts.push({ x, y: yNew });
+        }
       }
-      // Compute damping so peaks keep still: suppress high-frequency terms near extrema
-      const peakProximity = Math.pow(Math.abs(Math.cos(baseArg)), Math.max(1, o.peakNoisePower)); // 1 at zero-crossing, 0 at peak
-      const noiseScale = 1 - o.peakNoiseDamping * (1 - peakProximity);
-      // Co-moving samples reduce temporal jiggle at peaks
-      const radialIdx = (dist - phase) * (o.segments / Math.max(1, o.width));
-      const m = Math.max(0, Math.min(1, o.morphStrength)) * (0.5 - 0.5 * Math.cos(2 * Math.PI * morphT)); // cosine window 0..1..0
-      const stableNoise = sampleMorph(cachedFields.noisesA[i], cachedFields.noisesB[i], radialIdx, m);
-      const stableAmpMod = sampleMorph(cachedFields.ampModsA[i], cachedFields.ampModsB[i], radialIdx, m);
-      const mixedNoise = ((1 - o.peakStability) * (p.noise[k] || 0) + o.peakStability * stableNoise) * noiseScale;
-      const mixedAmpMod = ((1 - o.peakStability) * (cachedFields.ampModsA[i][k] || 0) + o.peakStability * stableAmpMod) * noiseScale;
-      // Creation-time amplitude envelope (co-moving), frozen after creation
-      // Add slight per-layer envelope strength variation so the top layer isn't locked
-      const envStrength = o.amplitudeEnvelopeStrength * (0.9 + 0.2 * ((i * 16807) % 11) / 10);
-      const env2 = 1 + envStrength * Math.sin(
-        2 * Math.PI * o.amplitudeEnvelopeCycles * (dist - phase) / Math.max(1, o.width) + (cachedFields.envelopePhases[i] + i * 0.37)
-      );
-      const baseAmp = p.amp * (cachedFields.ampLayerScale[i] || 1) * env2;
-      const ampMult = 1 + o.amplitudeJitter * mixedAmpMod;
-      const w = (baseAmp * ampMult) * wave + mixedNoise * p.rndF;
-      pts.push({ x, y: p.baseLine - w });
     }
 
-    if (o.curveType === 'linear') {
-      let d = `M 0 ${rnd(fillBase)}`;
-      d += ` L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
-      for (let idx = 1; idx < pts.length; idx++) {
-        const pt = pts[idx];
-        d += ` L ${rnd(pt.x)} ${rnd(pt.y)}`;
-      }
-      return d + ` L ${o.width} ${rnd(fillBase)} Z`;
-    }
-
-    // Optional local peak rounding (y-only pre-smoothing) before spline
+    // Optional peak-local rounding (uses periodic axis coordinates)
     if (o.peakRoundness > 0) {
       const power = Math.max(1, o.peakRoundnessPower || 1);
       const rounded = new Array(pts.length);
       for (let k = 0; k < pts.length; k++) {
-        const x = pts[k].x;
-        const dist = Math.abs(x - center);
-        const baseArg = p.freq * (dist - phase) + p.phi;
-        const peakWeight = Math.pow(1 - Math.abs(Math.cos(baseArg)), power); // 1 at peaks, 0 at zero-crossings
-        const w = Math.max(0, Math.min(1, o.peakRoundness * peakWeight));
-        const yPrev = pts[Math.max(0, k - 1)].y;
-        const yCurr = pts[k].y;
-        const yNext = pts[Math.min(pts.length - 1, k + 1)].y;
-        const neighborhoodAvg = (yPrev + yCurr + yNext) / 3;
-        const yRounded = yCurr * (1 - w) + neighborhoodAvg * w;
-        rounded[k] = { x, y: yRounded };
+        const x = pts[k].x, y = pts[k].y;
+        const sn = tPeriodicNormOf(x, y);
+        const arg = p.freq * sn + p.phi;
+        const peakW = Math.pow(1 - Math.abs(Math.cos(arg)), power);
+        const w = Math.max(0, Math.min(1, o.peakRoundness * peakW));
+        const yPrev = pts[Math.max(0, k - 1)].y, yNext = pts[Math.min(pts.length - 1, k + 1)].y;
+        const avg = (yPrev + y + yNext) / 3;
+        rounded[k] = { x, y: y * (1 - w) + avg * w };
       }
       for (let k = 0; k < pts.length; k++) pts[k] = rounded[k];
     }
 
-    // Catmull-Rom to Bezier spline for smooth top edge
-    const t = Math.max(0, Math.min(1, o.curveTension));
-    let d = `M 0 ${rnd(fillBase)} L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
+    // Spline
+    const tSmooth = Math.max(0, Math.min(1, o.curveTension));
+    let topPath = `M ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
+    let fillPath = `M 0 ${rnd(fillBase)} L ${rnd(pts[0].x)} ${rnd(pts[0].y)}`;
     for (let s = 0; s < pts.length - 1; s++) {
       const p0 = pts[s - 1] || pts[s];
       const p1 = pts[s];
       const p2 = pts[s + 1];
       const p3 = pts[s + 2] || p2;
-      const cp1x = p1.x + (p2.x - p0.x) / 6 * t;
-      const cp1y = p1.y + (p2.y - p0.y) / 6 * t;
-      const cp2x = p2.x - (p3.x - p1.x) / 6 * t;
-      const cp2y = p2.y - (p3.y - p1.y) / 6 * t;
-      d += ` C ${rnd(cp1x)} ${rnd(cp1y)} ${rnd(cp2x)} ${rnd(cp2y)} ${rnd(p2.x)} ${rnd(p2.y)}`;
+      const cp1x = p1.x + (p2.x - p0.x) / 6 * tSmooth;
+      const cp1y = p1.y + (p2.y - p0.y) / 6 * tSmooth;
+      const cp2x = p2.x - (p3.x - p1.x) / 6 * tSmooth;
+      const cp2y = p2.y - (p3.y - p1.y) / 6 * tSmooth;
+      const seg = ` C ${rnd(cp1x)} ${rnd(cp1y)} ${rnd(cp2x)} ${rnd(cp2y)} ${rnd(p2.x)} ${rnd(p2.y)}`;
+      topPath += seg;
+      fillPath += seg;
     }
-    return d + ` L ${o.width} ${rnd(fillBase)} Z`;
+    return {
+      fillPath: fillPath + ` L ${o.width} ${rnd(fillBase)} Z`,
+      topPath,
+    };
   };
 
   const pathsAt = (phase = 0, morphT = 0, cycleIndex = 0) => {
     ensureFields(Math.max(0, Math.floor(cycleIndex)));
-    return Array.from({ length: o.layers }, (_, i) => ({
-      d: pathFor(i, phase, morphT),
-      fill: colorAt(i),
-      opacity: opacityAt(i)
-    }));
+    return Array.from({ length: o.layers }, (_, i) => {
+      const pathData = pathFor(i, phase, morphT);
+      return {
+        d: pathData.fillPath,
+        topPath: pathData.topPath,
+        fill: colorAt(i),
+        opacity: opacityAt(i),
+      };
+    });
   };
 
   const svgAt = (phase = 0) => {
@@ -291,5 +335,5 @@ export function createCloudEngine(opts = {}) {
     </svg>`;
   };
 
-  return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, config: o };
+  return { pathsAt, svgAt, width: o.width, height: o.height, blur: o.blur, opacityRamp: defaultOpacityRamp, config: o };
 }

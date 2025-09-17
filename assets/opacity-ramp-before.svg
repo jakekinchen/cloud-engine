@@ -1,0 +1,25 @@
+<svg width="280" height="120" viewBox="0 0 280 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="280" height="120" fill="#0b1530" rx="12" ry="12" />
+  <g font-family="'Inter', sans-serif" font-size="10" fill="#dce7ff">
+    <text x="18" y="20">Layer 0</text>
+    <text x="56" y="20">1</text>
+    <text x="94" y="20">2</text>
+    <text x="132" y="20">3</text>
+    <text x="170" y="20">4</text>
+    <text x="208" y="20">5</text>
+    <text x="246" y="20">6</text>
+  </g>
+  <g>
+    <rect x="18" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.92" />
+    <rect x="56" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.898" />
+    <rect x="94" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.847" />
+    <rect x="132" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.775" />
+    <rect x="170" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.684" />
+    <rect x="208" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.575" />
+    <rect x="246" y="30" width="28" height="80" fill="#ffffff" fill-opacity="0.45" />
+  </g>
+  <g font-family="'Inter', sans-serif" font-size="10" fill="#9fb6ff">
+    <text x="20" y="115">Front</text>
+    <text x="232" y="115">Back</text>
+  </g>
+</svg>
