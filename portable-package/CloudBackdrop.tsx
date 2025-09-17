@@ -3,60 +3,7 @@
 import React, { useEffect, useMemo, useRef, useId } from 'react';
 import { createCloudEngine } from './cloud_maker';
 import cloudDefaults from './cloudDefaults.json';
-
-export type CloudMakerProps = {
-  width?: number;
-  height?: number;
-  layers?: number;
-  segments?: number;
-  baseColor?: string;
-  layerColors?: string[];
-  layerOpacities?: number[];
-  speed?: number;
-  seed?: number;
-  blur?: number;
-  waveForm?: 'sin' | 'cos' | 'sincos' | 'round';
-  noiseSmoothness?: number;
-  amplitudeJitter?: number;
-  amplitudeJitterScale?: number;
-  additiveBlending?: boolean;
-  backOpacity?: number;
-  frontOpacity?: number;
-  opacityCurvePower?: number;
-  curveType?: 'linear' | 'spline';
-  curveTension?: number;
-  peakStability?: number;
-  peakNoiseDamping?: number;
-  peakNoisePower?: number;
-  peakHarmonicDamping?: number;
-  useSharedBaseline?: boolean;
-  baseAmplitude?: number;
-  baseFrequency?: number;
-  layerFrequencyStep?: number;
-  secondaryWaveFactor?: number;
-  layerVerticalSpacing?: number;
-  morphStrength?: number;
-  morphPeriodSec?: number;
-  amplitudeEnvelopeStrength?: number;
-  amplitudeEnvelopeCycles?: number;
-  peakRoundness?: number;
-  peakRoundnessPower?: number;
-  seamlessLoop?: boolean;
-  animate?: boolean;
-  phase?: number;
-  morphT?: number;
-  cycleIndex?: number;
-  className?: string;
-  style?: React.CSSProperties;
-  fit?: 'stretch' | 'meet' | 'slice';
-  background?: false | string; // false: transparent, string: solid fill color
-  motionAngleDeg?: number;
-  periodicAngleDeg?: number;
-  paused?: boolean;
-  glowEnabled?: boolean;
-  glowIntensity?: number;
-  glowHueShift?: number;
-};
+import type { CloudMakerProps } from './types';
 
 type GlowConfig = {
   enabled: boolean;

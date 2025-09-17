@@ -1,50 +1,9 @@
-export { default as CloudMaker } from './CloudBackdrop';
-export type { CloudMakerProps } from './CloudBackdrop';
+import type { CloudConfig } from './types';
 
+export { default as CloudMaker } from './CloudBackdrop';
 export { createCloudEngine } from './cloud_maker';
 export { default as cloudDefaults } from './cloudDefaults.json';
-
-export type CloudConfig = Partial<{
-  width: number;
-  height: number;
-  layers: number;
-  segments: number;
-  baseColor: string;
-  layerColors: string[];
-  layerOpacities: number[];
-  seed: number;
-  blur: number;
-  waveForm: 'sin' | 'cos' | 'sincos' | 'round';
-  noiseSmoothness: number;
-  amplitudeJitter: number;
-  amplitudeJitterScale: number;
-  backOpacity: number;
-  frontOpacity: number;
-  opacityCurvePower: number;
-  curveType: 'linear' | 'spline';
-  curveTension: number;
-  peakStability: number;
-  peakNoiseDamping: number;
-  peakNoisePower: number;
-  peakHarmonicDamping: number;
-  useSharedBaseline: boolean;
-  baseAmplitude: number;
-  baseFrequency: number;
-  layerFrequencyStep: number;
-  secondaryWaveFactor: number;
-  layerVerticalSpacing: number;
-  morphStrength: number;
-  morphPeriodSec: number;
-  amplitudeEnvelopeStrength: number;
-  amplitudeEnvelopeCycles: number;
-  peakRoundness: number;
-  peakRoundnessPower: number;
-  motionAngleDeg: number;
-  periodicAngleDeg: number;
-  glowEnabled: boolean;
-  glowIntensity: number;
-  glowHueShift: number;
-}>;
+export type { CloudMakerProps, CloudConfig } from './types';
 
 export function renderSvg(config: CloudConfig = {}, opts: { phase?: number; morphT?: number; cycleIndex?: number } = {}) {
   const { createCloudEngine } = require('./cloud_maker');

@@ -53,6 +53,48 @@ type CloudMakerProps = {
     glowIntensity?: number;
     glowHueShift?: number;
 };
+type CloudConfig = Partial<{
+    width: number;
+    height: number;
+    layers: number;
+    segments: number;
+    baseColor: string;
+    layerColors: string[];
+    layerOpacities: number[];
+    seed: number;
+    blur: number;
+    waveForm: 'sin' | 'cos' | 'sincos' | 'round';
+    noiseSmoothness: number;
+    amplitudeJitter: number;
+    amplitudeJitterScale: number;
+    backOpacity: number;
+    frontOpacity: number;
+    opacityCurvePower: number;
+    curveType: 'linear' | 'spline';
+    curveTension: number;
+    peakStability: number;
+    peakNoiseDamping: number;
+    peakNoisePower: number;
+    peakHarmonicDamping: number;
+    useSharedBaseline: boolean;
+    baseAmplitude: number;
+    baseFrequency: number;
+    layerFrequencyStep: number;
+    secondaryWaveFactor: number;
+    layerVerticalSpacing: number;
+    morphStrength: number;
+    morphPeriodSec: number;
+    amplitudeEnvelopeStrength: number;
+    amplitudeEnvelopeCycles: number;
+    peakRoundness: number;
+    peakRoundnessPower: number;
+    motionAngleDeg: number;
+    periodicAngleDeg: number;
+    glowEnabled: boolean;
+    glowIntensity: number;
+    glowHueShift: number;
+}>;
+
 declare const CloudMaker: React.FC<CloudMakerProps>;
 
 declare function createCloudEngine(opts?: {}): {
@@ -198,47 +240,6 @@ var cloudDefaults = {
 	glowHueShift: glowHueShift
 };
 
-type CloudConfig = Partial<{
-    width: number;
-    height: number;
-    layers: number;
-    segments: number;
-    baseColor: string;
-    layerColors: string[];
-    layerOpacities: number[];
-    seed: number;
-    blur: number;
-    waveForm: 'sin' | 'cos' | 'sincos' | 'round';
-    noiseSmoothness: number;
-    amplitudeJitter: number;
-    amplitudeJitterScale: number;
-    backOpacity: number;
-    frontOpacity: number;
-    opacityCurvePower: number;
-    curveType: 'linear' | 'spline';
-    curveTension: number;
-    peakStability: number;
-    peakNoiseDamping: number;
-    peakNoisePower: number;
-    peakHarmonicDamping: number;
-    useSharedBaseline: boolean;
-    baseAmplitude: number;
-    baseFrequency: number;
-    layerFrequencyStep: number;
-    secondaryWaveFactor: number;
-    layerVerticalSpacing: number;
-    morphStrength: number;
-    morphPeriodSec: number;
-    amplitudeEnvelopeStrength: number;
-    amplitudeEnvelopeCycles: number;
-    peakRoundness: number;
-    peakRoundnessPower: number;
-    motionAngleDeg: number;
-    periodicAngleDeg: number;
-    glowEnabled: boolean;
-    glowIntensity: number;
-    glowHueShift: number;
-}>;
 declare function renderSvg(config?: CloudConfig, opts?: {
     phase?: number;
     morphT?: number;
